@@ -223,6 +223,7 @@ export default function App() {
     deleteMember,
     addBudget,
     updateBudget,
+    deleteBudget,
     addTransaction,
     updateTransaction,
     updatePeriod,
@@ -932,10 +933,30 @@ export default function App() {
                               </div>
                               <div className="budget-footer">
                                 <span>{item.rollover ? 'Rollover menyala' : 'Rollover mati'}</span>
-                                <button className="row-action-button muted" onClick={() => setEditingBudget(item)}>
-                                  <PencilLine size={14} />
-                                  Ubah
-                                </button>
+                                <div className="row-actions">
+                                  <button className="row-action-button muted" onClick={() => setEditingBudget(item)}>
+                                    <PencilLine size={14} />
+                                    Ubah
+                                  </button>
+                                  <button
+                                    className="row-action-button danger"
+                                    onClick={async () => {
+                                      const confirmed = window.confirm(`Hapus anggaran ${item.name}? Transaksi tidak akan ikut dihapus.`)
+
+                                      if (!confirmed) return
+
+                                      const result = await deleteBudget(item.id)
+                                      setBudgetActionMessage(result)
+
+                                      if (editingBudget?.id === item.id && result.ok) {
+                                        setEditingBudget(null)
+                                      }
+                                    }}
+                                  >
+                                    <Trash2 size={14} />
+                                    Hapus
+                                  </button>
+                                </div>
                               </div>
                             </article>
                           )

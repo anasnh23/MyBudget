@@ -763,6 +763,27 @@ export function useBudgetData(userId?: string, userEmail?: string, demoMode = fa
     return ok('Anggaran diperbarui.')
   }
 
+  const deleteBudget = async (id: string) => {
+    const currentBudget = budgets.find((item) => item.id === id)
+
+    if (!currentBudget) {
+      return fail('Anggaran tidak ditemukan.')
+    }
+
+    setBudgets((prev) => prev.filter((item) => item.id !== id))
+
+    if (shouldUseSupabase && supabase && userId) {
+      const { error } = await supabase.from('budget_categories').delete().eq('id', id)
+
+      if (error) {
+        setBudgets((prev) => [currentBudget, ...prev])
+        return fail(saveMessage(error.message))
+      }
+    }
+
+    return ok('Anggaran dihapus.')
+  }
+
   const updatePeriod = async (payload: Omit<BudgetPeriod, 'id'>, mode: PeriodCreationMode = 'reset') => {
     const nextPeriod: BudgetPeriod = {
       id: uid(),
@@ -1135,6 +1156,7 @@ export function useBudgetData(userId?: string, userEmail?: string, demoMode = fa
     deleteMember,
     addBudget,
     updateBudget,
+    deleteBudget,
     addTransaction,
     updateTransaction,
     updatePeriod,
