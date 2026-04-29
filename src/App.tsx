@@ -20,7 +20,6 @@ import {
   Goal,
   LayoutGrid,
   LogOut,
-  MoonStar,
   PencilLine,
   PiggyBank,
   ReceiptText,
@@ -53,7 +52,6 @@ import type {
   RecurringFrequency,
   RecurringTransaction,
   SavingGoal,
-  ThemeMode,
   TransactionItem,
   TransactionType,
 } from './types'
@@ -90,8 +88,6 @@ type HistoryFilters = {
   startDate: string
   endDate: string
 }
-
-const themeStorageKey = 'mybudget:theme-mode'
 
 function toFriendlyAuthMessage(message: string, mode: 'login' | 'register') {
   const text = message.toLowerCase()
@@ -154,17 +150,6 @@ function defaultAssetDraft(): Omit<AssetItem, 'id'> {
   }
 }
 
-function readThemeMode() {
-  if (typeof window === 'undefined') return 'default' as ThemeMode
-  return (window.localStorage.getItem(themeStorageKey) as ThemeMode | null) ?? 'default'
-}
-
-function resolveTheme(mode: ThemeMode) {
-  if (mode === 'dark') return 'dark'
-  if (typeof window === 'undefined') return 'light'
-  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
-}
-
 function budgetAlert(item: BudgetCategory) {
   if (!item.limit) {
     return { tone: 'safe', label: 'Belum ada limit', percent: 0 }
@@ -190,7 +175,6 @@ export default function App() {
   const [authFeedback, setAuthFeedback] = useState<AuthFeedback>({ tone: 'idle', text: '' })
   const [authLoading, setAuthLoading] = useState(false)
   const [showLoginPassword, setShowLoginPassword] = useState(false)
-  const [themeMode, setThemeMode] = useState<ThemeMode>(readThemeMode)
   const [filters, setFilters] = useState<HistoryFilters>({
     type: 'all',
     query: '',
@@ -216,29 +200,6 @@ export default function App() {
 
     return () => subscription.unsubscribe()
   }, [])
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-
-    window.localStorage.setItem(themeStorageKey, themeMode)
-    const resolved = resolveTheme(themeMode)
-    document.documentElement.dataset.theme = resolved
-    document.documentElement.dataset.themeMode = themeMode
-  }, [themeMode])
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    if (themeMode !== 'default') return
-
-    const media = window.matchMedia('(prefers-color-scheme: dark)')
-    const apply = () => {
-      document.documentElement.dataset.theme = media.matches ? 'dark' : 'light'
-    }
-
-    apply()
-    media.addEventListener('change', apply)
-    return () => media.removeEventListener('change', apply)
-  }, [themeMode])
 
   const appUserId = session?.user.id ?? (demoMode ? 'demo-user' : undefined)
   const appUserEmail = session?.user.email ?? (demoMode ? 'demo@mybudget.local' : undefined)
@@ -933,8 +894,6 @@ export default function App() {
                 <ProfilePanel
                   userName={userName}
                   email={appUserEmail ?? '-'}
-                  themeMode={themeMode}
-                  onChangeTheme={setThemeMode}
                   onSaveName={updateProfileName}
                   onSavePassword={updateProfilePassword}
                 />
@@ -1176,15 +1135,11 @@ function WalletPanel({
 function ProfilePanel({
   userName,
   email,
-  themeMode,
-  onChangeTheme,
   onSaveName,
   onSavePassword,
 }: {
   userName: string
   email: string
-  themeMode: ThemeMode
-  onChangeTheme: (mode: ThemeMode) => void
   onSaveName: (name: string) => Promise<{ ok: boolean; message: string }>
   onSavePassword: (password: string) => Promise<{ ok: boolean; message: string }>
 }) {
@@ -1205,21 +1160,6 @@ function ProfilePanel({
           <p className="profile-label">Profil</p>
           <h2>{userName}</h2>
           <span>{email}</span>
-        </div>
-      </section>
-
-      <section className="card">
-        <div className="section-title">
-          <h2>Tampilan</h2>
-          <MoonStar size={18} />
-        </div>
-        <div className="theme-toggle">
-          <button className={themeMode === 'default' ? 'theme-option active' : 'theme-option'} onClick={() => onChangeTheme('default')}>
-            Ikuti perangkat
-          </button>
-          <button className={themeMode === 'dark' ? 'theme-option active' : 'theme-option'} onClick={() => onChangeTheme('dark')}>
-            Gelap
-          </button>
         </div>
       </section>
 

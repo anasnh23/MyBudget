@@ -64,8 +64,6 @@ export type SavingGoal = {
   note: string
 }
 
-export type ThemeMode = 'default' | 'dark'
-
 export type AssetType = 'deposito' | 'emas' | 'reksa_dana' | 'saham' | 'crypto' | 'lainnya'
 
 export type AssetItem = {
