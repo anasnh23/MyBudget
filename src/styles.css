@@ -893,6 +893,10 @@ textarea:focus {
   color: #b45309;
 }
 
+.success-note {
+  color: #0e9f6e;
+}
+
 .insight-grid,
 .quick-actions {
   display: grid;

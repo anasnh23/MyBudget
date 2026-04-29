@@ -79,6 +79,11 @@ type AuthFeedback = {
   text: string
 }
 
+type SaveResult = {
+  ok: boolean
+  message: string
+}
+
 type HistoryFilters = {
   type: 'all' | TransactionType
   query: string
@@ -771,12 +776,18 @@ export default function App() {
                   editingTransaction={editingTransaction}
                   editingRecurring={editingRecurring}
                   onCreate={async (payload) => {
-                    await addTransaction(payload)
-                    setEditingTransaction(null)
+                    const result = await addTransaction(payload)
+                    if (result.ok) {
+                      setEditingTransaction(null)
+                    }
+                    return result
                   }}
                   onUpdate={async (id, payload) => {
-                    await updateTransaction(id, payload)
-                    setEditingTransaction(null)
+                    const result = await updateTransaction(id, payload)
+                    if (result.ok) {
+                      setEditingTransaction(null)
+                    }
+                    return result
                   }}
                   onCancelEdit={() => setEditingTransaction(null)}
                   onOpenWallet={() => setActiveTab('wallet')}
@@ -812,10 +823,13 @@ export default function App() {
                     onCancelEdit={() => setEditingBudget(null)}
                     onSubmit={async (payload) => {
                       if (editingBudget) {
-                        await updateBudget(editingBudget.id, payload)
-                        setEditingBudget(null)
+                        const result = await updateBudget(editingBudget.id, payload)
+                        if (result.ok) {
+                          setEditingBudget(null)
+                        }
+                        return result
                       } else {
-                        await addBudget(payload)
+                        return addBudget(payload)
                       }
                     }}
                   />
@@ -1068,9 +1082,10 @@ function WalletPanel({
 }: {
   accounts: Account[]
   totalBalance: number
-  onAddAccount: (payload: { name: string; balance: number }) => Promise<void>
+  onAddAccount: (payload: { name: string; balance: number }) => Promise<SaveResult>
 }) {
   const [form, setForm] = useState({ name: '', balance: '' })
+  const [message, setMessage] = useState<SaveResult | null>(null)
 
   return (
     <>
@@ -1089,8 +1104,11 @@ function WalletPanel({
           onSubmit={async (event) => {
             event.preventDefault()
             if (!form.name || !form.balance) return
-            await onAddAccount({ name: form.name, balance: Number(form.balance) })
-            setForm({ name: '', balance: '' })
+            const result = await onAddAccount({ name: form.name, balance: Number(form.balance) })
+            setMessage(result)
+            if (result.ok) {
+              setForm({ name: '', balance: '' })
+            }
           }}
         >
           <label className="field-block">
@@ -1102,6 +1120,7 @@ function WalletPanel({
             <input value={form.balance} onChange={(event) => setForm((prev) => ({ ...prev, balance: event.target.value }))} placeholder="0" type="number" />
           </label>
           <button className="primary-button">Simpan dompet</button>
+          {message && <p className={message.ok ? 'small-note success-note' : 'small-note warning-note'}>{message.message}</p>}
         </form>
       </section>
 
@@ -1321,11 +1340,12 @@ function AddBudgetPanel({
 }: {
   editingBudget: BudgetCategory | null
   onCancelEdit: () => void
-  onSubmit: (payload: { name: string; limit: number; rollover: boolean }) => Promise<void>
+  onSubmit: (payload: { name: string; limit: number; rollover: boolean }) => Promise<SaveResult>
 }) {
   const [name, setName] = useState('')
   const [limit, setLimit] = useState('')
   const [rollover, setRollover] = useState(false)
+  const [message, setMessage] = useState<SaveResult | null>(null)
 
   useEffect(() => {
     if (editingBudget) {
@@ -1357,8 +1377,9 @@ function AddBudgetPanel({
         onSubmit={async (event) => {
           event.preventDefault()
           if (!name || !limit) return
-          await onSubmit({ name, limit: Number(limit), rollover })
-          if (!editingBudget) {
+          const result = await onSubmit({ name, limit: Number(limit), rollover })
+          setMessage(result)
+          if (result.ok && !editingBudget) {
             setName('')
             setLimit('')
             setRollover(false)
@@ -1378,6 +1399,7 @@ function AddBudgetPanel({
           <span>Bawa sisa atau selisih anggaran ke periode berikutnya</span>
         </label>
         <button className="primary-button">{editingBudget ? 'Simpan perubahan' : 'Simpan anggaran'}</button>
+        {message && <p className={message.ok ? 'small-note success-note' : 'small-note warning-note'}>{message.message}</p>}
       </form>
     </section>
   )
@@ -1494,8 +1516,8 @@ function AddTransactionPanel({
   dueRecurringCount: number
   editingTransaction: TransactionItem | null
   editingRecurring: RecurringTransaction | null
-  onCreate: (payload: Omit<TransactionItem, 'id'>) => Promise<void>
-  onUpdate: (id: string, payload: Omit<TransactionItem, 'id'>) => Promise<void>
+  onCreate: (payload: Omit<TransactionItem, 'id'>) => Promise<SaveResult>
+  onUpdate: (id: string, payload: Omit<TransactionItem, 'id'>) => Promise<SaveResult>
   onCancelEdit: () => void
   onOpenWallet: () => void
   onOpenBudget: () => void
@@ -1504,11 +1526,12 @@ function AddTransactionPanel({
   onEditRecurring: (item: RecurringTransaction) => void
   onCancelRecurringEdit: () => void
   onDeleteRecurring: (id: string) => Promise<void>
-  onRunRecurring: (id: string) => Promise<void>
+  onRunRecurring: (id: string) => Promise<SaveResult | undefined>
 }) {
   const [form, setForm] = useState(() => defaultTransactionDraft(accounts, categories, defaultMember))
   const [recurringForm, setRecurringForm] = useState(() => defaultRecurringDraft(accounts, categories, defaultMember))
   const [entryMode, setEntryMode] = useState<'single' | 'recurring'>('single')
+  const [transactionMessage, setTransactionMessage] = useState<SaveResult | null>(null)
 
   useEffect(() => {
     if (editingTransaction) {
@@ -1601,8 +1624,14 @@ function AddTransactionPanel({
           className="form-grid"
           onSubmit={async (event) => {
             event.preventDefault()
-            if (!form.title || !form.amount || !form.account) return
-            if (form.type === 'transfer' && (!form.toAccount || form.toAccount === form.account)) return
+              if (!form.title || !form.amount || !form.account) {
+                setTransactionMessage({ ok: false, message: 'Lengkapi nama transaksi, nominal, dan dompet.' })
+                return
+              }
+              if (form.type === 'transfer' && (!form.toAccount || form.toAccount === form.account)) {
+                setTransactionMessage({ ok: false, message: 'Pilih dompet tujuan yang berbeda.' })
+                return
+              }
 
             const payload = {
               ...form,
@@ -1611,13 +1640,19 @@ function AddTransactionPanel({
               toAccount: form.type === 'transfer' ? form.toAccount : undefined,
             }
 
-            if (editingTransaction) {
-              await onUpdate(editingTransaction.id, payload)
-            } else {
-              await onCreate(payload)
-            }
-          }}
-        >
+              const result = editingTransaction ? await onUpdate(editingTransaction.id, payload) : await onCreate(payload)
+              setTransactionMessage(result)
+
+              if (result.ok && !editingTransaction) {
+                setForm((prev) => ({
+                  ...prev,
+                  title: '',
+                  amount: 0,
+                  note: '',
+                }))
+              }
+            }}
+          >
           <div className="toggle-grid">
             {(['expense', 'income', 'transfer'] as TransactionType[]).map((type) => (
               <button key={type} type="button" className={form.type === type ? 'toggle-pill active' : 'toggle-pill'} onClick={() => setForm((prev) => ({ ...prev, type }))}>
@@ -1752,6 +1787,9 @@ function AddTransactionPanel({
           <button className="primary-button" disabled={!canSubmitTransaction}>
             {editingTransaction ? 'Simpan perubahan' : 'Simpan transaksi'}
           </button>
+          {transactionMessage && (
+            <p className={transactionMessage.ok ? 'small-note success-note' : 'small-note warning-note'}>{transactionMessage.message}</p>
+          )}
         </form>
       </section>
       ) : (
@@ -2285,7 +2323,7 @@ function TransactionList({
   emptyLabel,
 }: {
   transactions: TransactionItem[]
-  onDelete: (id: string) => Promise<void>
+  onDelete: (id: string) => Promise<SaveResult>
   onEdit: (transaction: TransactionItem) => void
   emptyLabel: string
 }) {

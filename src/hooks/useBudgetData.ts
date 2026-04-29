@@ -18,6 +18,93 @@ import type {
 const uid = () => crypto.randomUUID()
 
 const accountColors = ['#6346f7', '#13b981', '#06b6d4', '#f97316', '#ec4899']
+const metaPrefix = '__MYBUDGET_META__'
+
+type SaveResult = {
+  ok: boolean
+  message: string
+}
+
+function ok(message: string): SaveResult {
+  return { ok: true, message }
+}
+
+function fail(message: string): SaveResult {
+  return { ok: false, message }
+}
+
+function isMissingColumnError(message: string) {
+  const text = message.toLowerCase()
+  return text.includes('column') || text.includes('schema cache') || text.includes('could not find')
+}
+
+function encodeTransactionNote(transaction: Pick<TransactionItem, 'note' | 'toAccount' | 'member'>) {
+  const meta = {
+    toAccount: transaction.toAccount,
+    member: transaction.member,
+  }
+
+  if (!meta.toAccount && !meta.member) {
+    return transaction.note
+  }
+
+  return `${metaPrefix}${JSON.stringify(meta)}\n${transaction.note ?? ''}`
+}
+
+function decodeTransactionNote(note?: string | null) {
+  const cleanNote = note ?? ''
+
+  if (!cleanNote.startsWith(metaPrefix)) {
+    return {
+      note: cleanNote,
+      toAccount: undefined as string | undefined,
+      member: undefined as string | undefined,
+    }
+  }
+
+  const [metaLine, ...noteLines] = cleanNote.split('\n')
+
+  try {
+    const meta = JSON.parse(metaLine.slice(metaPrefix.length)) as {
+      toAccount?: string
+      member?: string
+    }
+
+    return {
+      note: noteLines.join('\n'),
+      toAccount: meta.toAccount,
+      member: meta.member,
+    }
+  } catch {
+    return {
+      note: cleanNote,
+      toAccount: undefined as string | undefined,
+      member: undefined as string | undefined,
+    }
+  }
+}
+
+function saveMessage(message: string) {
+  const text = message.toLowerCase()
+
+  if (text.includes('row-level security') || text.includes('violates row-level security')) {
+    return 'Data belum tersimpan. Periksa izin akses Supabase.'
+  }
+
+  if (text.includes('permission denied')) {
+    return 'Data belum tersimpan. Izin tabel belum aktif.'
+  }
+
+  if (text.includes('relation') && text.includes('does not exist')) {
+    return 'Data belum tersimpan. Tabel belum tersedia di Supabase.'
+  }
+
+  if (isMissingColumnError(message)) {
+    return 'Data belum tersimpan lengkap. Jalankan ulang supabase-schema.sql.'
+  }
+
+  return 'Data belum tersimpan. Periksa koneksi atau pengaturan Supabase.'
+}
 
 function memberSaveMessage(message: string) {
   const text = message.toLowerCase()
@@ -186,18 +273,22 @@ export function useBudgetData(userId?: string, userEmail?: string, demoMode = fa
             rollover: Boolean(item.rollover_enabled),
           })) ?? [],
         transactions:
-          transactions?.map((item) => ({
-            id: item.id,
-            title: item.title,
-            amount: Number(item.amount),
-            type: item.type,
-            category: item.category,
-            account: item.account_name,
-            toAccount: item.to_account_name ?? undefined,
-            member: item.member_name ?? undefined,
-            date: item.date,
-            note: item.note ?? '',
-          })) ?? [],
+          transactions?.map((item) => {
+            const decoded = decodeTransactionNote(item.note)
+
+            return {
+              id: item.id,
+              title: item.title,
+              amount: Number(item.amount),
+              type: item.type,
+              category: item.category,
+              account: item.account_name,
+              toAccount: item.to_account_name ?? decoded.toAccount,
+              member: item.member_name ?? decoded.member,
+              date: item.date,
+              note: decoded.note,
+            }
+          }) ?? [],
       })
       setLoading(false)
     }
@@ -232,6 +323,118 @@ export function useBudgetData(userId?: string, userEmail?: string, demoMode = fa
     return recurringTransactions.filter((item) => item.nextDate <= today).length
   }, [recurringTransactions])
 
+  const persistBalances = async (accounts: Account[], budgets: BudgetCategory[]) => {
+    if (!shouldUseSupabase || !supabase || !userId) {
+      return ok('Data tersimpan.')
+    }
+
+    const client = supabase
+
+    const results = await Promise.all([
+      ...accounts.map((item) => client.from('accounts').update({ balance: item.balance }).eq('id', item.id)),
+      ...budgets.map((item) => client.from('budget_categories').update({ spent_amount: item.spent }).eq('id', item.id)),
+    ])
+
+    const error = results.find((item) => item.error)?.error
+    if (error) {
+      return fail(saveMessage(error.message))
+    }
+
+    return ok('Data tersimpan.')
+  }
+
+  const insertTransactionToSupabase = async (transaction: TransactionItem) => {
+    if (!shouldUseSupabase || !supabase || !userId) {
+      return ok('Transaksi tersimpan.')
+    }
+
+    const client = supabase
+    const basePayload = {
+      id: transaction.id,
+      user_id: userId,
+      title: transaction.title,
+      amount: transaction.amount,
+      type: transaction.type,
+      category: transaction.category,
+      account_name: transaction.account,
+      date: transaction.date,
+      note: transaction.note,
+    }
+
+    const { error } = await client.from('transactions').insert({
+      ...basePayload,
+      to_account_name: transaction.toAccount ?? null,
+      member_name: transaction.member ?? null,
+    })
+
+    if (!error) {
+      return ok('Transaksi tersimpan.')
+    }
+
+    if (!isMissingColumnError(error.message)) {
+      return fail(saveMessage(error.message))
+    }
+
+    const fallback = await client.from('transactions').insert({
+      ...basePayload,
+      note: encodeTransactionNote(transaction),
+    })
+
+    if (fallback.error) {
+      return fail(saveMessage(fallback.error.message))
+    }
+
+    return ok('Transaksi tersimpan. Jalankan ulang supabase-schema.sql agar data member dan tujuan transfer tersimpan di kolom khusus.')
+  }
+
+  const updateTransactionInSupabase = async (transaction: TransactionItem) => {
+    if (!shouldUseSupabase || !supabase || !userId) {
+      return ok('Transaksi diperbarui.')
+    }
+
+    const client = supabase
+    const basePayload = {
+      title: transaction.title,
+      amount: transaction.amount,
+      type: transaction.type,
+      category: transaction.category,
+      account_name: transaction.account,
+      date: transaction.date,
+      note: transaction.note,
+    }
+
+    const { error } = await client
+      .from('transactions')
+      .update({
+        ...basePayload,
+        to_account_name: transaction.toAccount ?? null,
+        member_name: transaction.member ?? null,
+      })
+      .eq('id', transaction.id)
+
+    if (!error) {
+      return ok('Transaksi diperbarui.')
+    }
+
+    if (!isMissingColumnError(error.message)) {
+      return fail(saveMessage(error.message))
+    }
+
+    const fallback = await client
+      .from('transactions')
+      .update({
+        ...basePayload,
+        note: encodeTransactionNote(transaction),
+      })
+      .eq('id', transaction.id)
+
+    if (fallback.error) {
+      return fail(saveMessage(fallback.error.message))
+    }
+
+    return ok('Transaksi diperbarui. Jalankan ulang supabase-schema.sql agar data member dan tujuan transfer tersimpan di kolom khusus.')
+  }
+
   const addAccount = async (payload: { name: string; balance: number }) => {
     const nextAccount: Account = {
       id: uid(),
@@ -243,14 +446,21 @@ export function useBudgetData(userId?: string, userEmail?: string, demoMode = fa
     setData((prev) => ({ ...prev, accounts: [nextAccount, ...prev.accounts] }))
 
     if (shouldUseSupabase && supabase && userId) {
-      await supabase.from('accounts').insert({
+      const { error } = await supabase.from('accounts').insert({
         id: nextAccount.id,
         user_id: userId,
         name: nextAccount.name,
         balance: nextAccount.balance,
         color: nextAccount.color,
       })
+
+      if (error) {
+        setData((prev) => ({ ...prev, accounts: prev.accounts.filter((item) => item.id !== nextAccount.id) }))
+        return fail(saveMessage(error.message))
+      }
     }
+
+    return ok('Dompet tersimpan.')
   }
 
   const addMember = async (payload: { name: string; email: string; password: string; role: string }) => {
@@ -324,7 +534,7 @@ export function useBudgetData(userId?: string, userEmail?: string, demoMode = fa
     setData((prev) => ({ ...prev, budgets: [nextBudget, ...prev.budgets] }))
 
     if (shouldUseSupabase && supabase && userId) {
-      await supabase.from('budget_categories').insert({
+      const { error } = await supabase.from('budget_categories').insert({
         id: nextBudget.id,
         user_id: userId,
         name: nextBudget.name,
@@ -333,10 +543,37 @@ export function useBudgetData(userId?: string, userEmail?: string, demoMode = fa
         rollover_enabled: nextBudget.rollover,
         color: nextBudget.color,
       })
+
+      if (error && isMissingColumnError(error.message)) {
+        const fallback = await supabase.from('budget_categories').insert({
+          id: nextBudget.id,
+          user_id: userId,
+          name: nextBudget.name,
+          limit_amount: nextBudget.limit,
+          spent_amount: nextBudget.spent,
+          color: nextBudget.color,
+        })
+
+        if (fallback.error) {
+          setData((prev) => ({ ...prev, budgets: prev.budgets.filter((item) => item.id !== nextBudget.id) }))
+          return fail(saveMessage(fallback.error.message))
+        }
+
+        return ok('Anggaran tersimpan. Jalankan ulang supabase-schema.sql agar fitur rollover tersimpan di Supabase.')
+      }
+
+      if (error) {
+        setData((prev) => ({ ...prev, budgets: prev.budgets.filter((item) => item.id !== nextBudget.id) }))
+        return fail(saveMessage(error.message))
+      }
     }
+
+    return ok('Anggaran tersimpan.')
   }
 
   const updateBudget = async (id: string, payload: { name: string; limit: number; rollover: boolean }) => {
+    const currentBudget = data.budgets.find((item) => item.id === id)
+
     setData((prev) => ({
       ...prev,
       budgets: prev.budgets.map((item) =>
@@ -345,7 +582,7 @@ export function useBudgetData(userId?: string, userEmail?: string, demoMode = fa
     }))
 
     if (shouldUseSupabase && supabase && userId) {
-      await supabase
+      const { error } = await supabase
         .from('budget_categories')
         .update({
           name: payload.name,
@@ -353,7 +590,41 @@ export function useBudgetData(userId?: string, userEmail?: string, demoMode = fa
           rollover_enabled: payload.rollover,
         })
         .eq('id', id)
+
+      if (error && isMissingColumnError(error.message)) {
+        const fallback = await supabase
+          .from('budget_categories')
+          .update({
+            name: payload.name,
+            limit_amount: payload.limit,
+          })
+          .eq('id', id)
+
+        if (fallback.error) {
+          if (currentBudget) {
+            setData((prev) => ({
+              ...prev,
+              budgets: prev.budgets.map((item) => (item.id === id ? currentBudget : item)),
+            }))
+          }
+          return fail(saveMessage(fallback.error.message))
+        }
+
+        return ok('Anggaran diperbarui. Jalankan ulang supabase-schema.sql agar fitur rollover tersimpan di Supabase.')
+      }
+
+      if (error) {
+        if (currentBudget) {
+          setData((prev) => ({
+            ...prev,
+            budgets: prev.budgets.map((item) => (item.id === id ? currentBudget : item)),
+          }))
+        }
+        return fail(saveMessage(error.message))
+      }
     }
+
+    return ok('Anggaran diperbarui.')
   }
 
   const updatePeriod = async (period: BudgetPeriod) => {
@@ -408,87 +679,109 @@ export function useBudgetData(userId?: string, userEmail?: string, demoMode = fa
 
   const addTransaction = async (payload: Omit<TransactionItem, 'id'>) => {
     const nextTransaction: TransactionItem = { id: uid(), ...payload }
+    const impacted = applyTransactionImpact(data.accounts, data.budgets, nextTransaction, 1)
 
-    setData((prev) => {
-      const impacted = applyTransactionImpact(prev.accounts, prev.budgets, nextTransaction, 1)
-      return {
+    setData((prev) => ({
+      ...prev,
+      accounts: impacted.accounts,
+      budgets: impacted.budgets,
+      transactions: [nextTransaction, ...prev.transactions],
+    }))
+
+    const transactionResult = await insertTransactionToSupabase(nextTransaction)
+
+    if (!transactionResult.ok) {
+      setData((prev) => ({
         ...prev,
-        accounts: impacted.accounts,
-        budgets: impacted.budgets,
-        transactions: [nextTransaction, ...prev.transactions],
-      }
-    })
-
-    if (shouldUseSupabase && supabase && userId) {
-      await supabase.from('transactions').insert({
-        id: nextTransaction.id,
-        user_id: userId,
-        title: nextTransaction.title,
-        amount: nextTransaction.amount,
-        type: nextTransaction.type,
-        category: nextTransaction.category,
-        account_name: nextTransaction.account,
-        to_account_name: nextTransaction.toAccount ?? null,
-        member_name: nextTransaction.member ?? null,
-        date: nextTransaction.date,
-        note: nextTransaction.note,
-      })
+        accounts: data.accounts,
+        budgets: data.budgets,
+        transactions: prev.transactions.filter((item) => item.id !== nextTransaction.id),
+      }))
+      return transactionResult
     }
+
+    const balanceResult = await persistBalances(impacted.accounts, impacted.budgets)
+    if (!balanceResult.ok) {
+      return fail('Transaksi tersimpan, tetapi saldo dompet atau anggaran belum diperbarui. Periksa izin tabel di Supabase.')
+    }
+
+    return transactionResult
   }
 
   const updateTransaction = async (id: string, payload: Omit<TransactionItem, 'id'>) => {
     const nextTransaction: TransactionItem = { id, ...payload }
+    const current = data.transactions.find((item) => item.id === id)
 
-    setData((prev) => {
-      const current = prev.transactions.find((item) => item.id === id)
-      if (!current) return prev
-
-      const reverted = applyTransactionImpact(prev.accounts, prev.budgets, current, -1)
-      const impacted = applyTransactionImpact(reverted.accounts, reverted.budgets, nextTransaction, 1)
-
-      return {
-        ...prev,
-        accounts: impacted.accounts,
-        budgets: impacted.budgets,
-        transactions: prev.transactions.map((item) => (item.id === id ? nextTransaction : item)),
-      }
-    })
-
-    if (shouldUseSupabase && supabase && userId) {
-      await supabase
-        .from('transactions')
-        .update({
-          title: nextTransaction.title,
-          amount: nextTransaction.amount,
-          type: nextTransaction.type,
-          category: nextTransaction.category,
-          account_name: nextTransaction.account,
-          to_account_name: nextTransaction.toAccount ?? null,
-          member_name: nextTransaction.member ?? null,
-          date: nextTransaction.date,
-          note: nextTransaction.note,
-        })
-        .eq('id', id)
+    if (!current) {
+      return fail('Transaksi tidak ditemukan.')
     }
+
+    const reverted = applyTransactionImpact(data.accounts, data.budgets, current, -1)
+    const impacted = applyTransactionImpact(reverted.accounts, reverted.budgets, nextTransaction, 1)
+
+    setData((prev) => ({
+      ...prev,
+      accounts: impacted.accounts,
+      budgets: impacted.budgets,
+      transactions: prev.transactions.map((item) => (item.id === id ? nextTransaction : item)),
+    }))
+
+    const transactionResult = await updateTransactionInSupabase(nextTransaction)
+
+    if (!transactionResult.ok) {
+      setData((prev) => ({
+        ...prev,
+        accounts: data.accounts,
+        budgets: data.budgets,
+        transactions: prev.transactions.map((item) => (item.id === id ? current : item)),
+      }))
+      return transactionResult
+    }
+
+    const balanceResult = await persistBalances(impacted.accounts, impacted.budgets)
+    if (!balanceResult.ok) {
+      return fail('Transaksi diperbarui, tetapi saldo dompet atau anggaran belum diperbarui. Periksa izin tabel di Supabase.')
+    }
+
+    return transactionResult
   }
 
   const deleteTransaction = async (id: string) => {
-    setData((prev) => {
-      const current = prev.transactions.find((item) => item.id === id)
-      if (!current) return prev
+    const current = data.transactions.find((item) => item.id === id)
 
-      const reverted = applyTransactionImpact(prev.accounts, prev.budgets, current, -1)
-      return {
-        ...prev,
-        accounts: reverted.accounts,
-        budgets: reverted.budgets,
-        transactions: prev.transactions.filter((item) => item.id !== id),
-      }
-    })
+    if (!current) {
+      return fail('Transaksi tidak ditemukan.')
+    }
+
+    const reverted = applyTransactionImpact(data.accounts, data.budgets, current, -1)
+
+    setData((prev) => ({
+      ...prev,
+      accounts: reverted.accounts,
+      budgets: reverted.budgets,
+      transactions: prev.transactions.filter((item) => item.id !== id),
+    }))
 
     if (shouldUseSupabase && supabase && userId) {
-      await supabase.from('transactions').delete().eq('id', id)
+      const { error } = await supabase.from('transactions').delete().eq('id', id)
+
+      if (error) {
+        setData((prev) => ({
+          ...prev,
+          accounts: data.accounts,
+          budgets: data.budgets,
+          transactions: [current, ...prev.transactions],
+        }))
+        return fail(saveMessage(error.message))
+      }
     }
+
+    const balanceResult = await persistBalances(reverted.accounts, reverted.budgets)
+    if (!balanceResult.ok) {
+      return fail('Transaksi dihapus, tetapi saldo dompet atau anggaran belum diperbarui. Periksa izin tabel di Supabase.')
+    }
+
+    return ok('Transaksi dihapus.')
   }
 
   const addRecurringTransaction = async (payload: Omit<RecurringTransaction, 'id' | 'lastCreatedAt'>) => {
@@ -509,7 +802,7 @@ export function useBudgetData(userId?: string, userEmail?: string, demoMode = fa
 
     const createdDate = todayIso()
 
-    await addTransaction({
+    const result = await addTransaction({
       title: item.title,
       amount: item.amount,
       type: item.type,
@@ -521,6 +814,10 @@ export function useBudgetData(userId?: string, userEmail?: string, demoMode = fa
       note: item.note,
     })
 
+    if (!result.ok) {
+      return result
+    }
+
     setRecurringTransactions((prev) =>
       prev.map((entry) =>
         entry.id === id
@@ -528,6 +825,8 @@ export function useBudgetData(userId?: string, userEmail?: string, demoMode = fa
           : entry,
       ),
     )
+
+    return ok('Transaksi rutin dicatat.')
   }
 
   const addSavingGoal = async (payload: Omit<SavingGoal, 'id'>) => {
