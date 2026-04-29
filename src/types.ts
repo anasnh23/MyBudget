@@ -1,4 +1,4 @@
-export type NavKey = 'home' | 'history' | 'add' | 'budget' | 'wallet' | 'setup'
+export type NavKey = 'home' | 'history' | 'add' | 'budget' | 'wallet' | 'profile' | 'setup'
 
 export type TransactionType = 'expense' | 'income' | 'transfer'
 

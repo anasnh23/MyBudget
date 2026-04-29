@@ -715,6 +715,53 @@ textarea:focus {
   gap: 10px;
 }
 
+.profile-hero {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.profile-avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 18px;
+  display: grid;
+  place-items: center;
+  color: white;
+  font-size: 1.1rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, #3047d6 0%, #8247ff 100%);
+  box-shadow: 0 16px 28px rgba(91, 57, 215, 0.22);
+  flex: 0 0 auto;
+}
+
+.profile-copy {
+  min-width: 0;
+}
+
+.profile-label {
+  margin: 0 0 4px;
+  color: #6b7892;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.profile-copy h2 {
+  margin: 0;
+  color: #172038;
+  font-size: 1.18rem;
+}
+
+.profile-copy span {
+  display: block;
+  margin-top: 4px;
+  color: #6b7892;
+  font-size: 0.92rem;
+  overflow-wrap: anywhere;
+}
+
 .member-row {
   display: flex;
   align-items: center;

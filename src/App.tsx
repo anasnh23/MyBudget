@@ -25,6 +25,7 @@ import {
   Target,
   TrendingUp,
   Trash2,
+  UserCircle2,
   UserPlus,
   UsersRound,
   Wallet,
@@ -43,6 +44,7 @@ const baseNavItems = [
   { key: 'add', label: 'Catat', icon: BadgeDollarSign },
   { key: 'budget', label: 'Budget', icon: Target },
   { key: 'wallet', label: 'Dompet', icon: Wallet },
+  { key: 'profile', label: 'Profile', icon: UserCircle2 },
 ] as const
 
 const adminNavItem = { key: 'setup', label: 'Admin', icon: Settings } as const
@@ -97,6 +99,7 @@ function toFriendlyAuthMessage(message: string, mode: 'login' | 'register') {
 export default function App() {
   const [session, setSession] = useState<Session | null>(null)
   const [demoMode, setDemoMode] = useState(false)
+  const [demoProfileName, setDemoProfileName] = useState('Demo User')
   const [activeTab, setActiveTab] = useState<NavKey>('home')
   const [authForm, setAuthForm] = useState({ email: '', password: '' })
   const [authFeedback, setAuthFeedback] = useState<AuthFeedback>({ tone: 'idle', text: '' })
@@ -126,20 +129,20 @@ export default function App() {
     color: item.color,
   }))
 
-  const recentTransactions = useMemo(() => data.transactions.slice(0, 8), [data.transactions])
-  const totalSaved = Math.max(summary.totalIncome - summary.totalExpense, 0)
-  const userName =
-    (demoMode ? 'Demo User' : undefined) ??
-    session?.user.user_metadata.full_name ??
-    session?.user.user_metadata.name ??
-    session?.user.email?.split('@')[0] ??
-    'Kamu'
-
   const isSeedAdmin = session?.user.email?.toLowerCase() === 'admin@kunci.cloud'
   const currentMember = data.members.find((item) => item.email.toLowerCase() === appUserEmail?.toLowerCase())
   const isAdmin = isSeedAdmin || currentMember?.role.toLowerCase() === 'admin'
   const canUseApp = demoMode || !supabaseEnabled || !session || loading || isSeedAdmin || Boolean(currentMember)
   const navItems = isAdmin ? [adminNavItem] : baseNavItems
+  const recentTransactions = useMemo(() => data.transactions.slice(0, 8), [data.transactions])
+  const totalSaved = Math.max(summary.totalIncome - summary.totalExpense, 0)
+  const userName =
+    (demoMode ? demoProfileName : undefined) ??
+    session?.user.user_metadata.full_name ??
+    session?.user.user_metadata.name ??
+    currentMember?.name ??
+    session?.user.email?.split('@')[0] ??
+    'Kamu'
 
   useEffect(() => {
     if (isAdmin && activeTab !== 'setup') {
@@ -228,13 +231,77 @@ export default function App() {
       await supabase.auth.signOut()
     }
     setDemoMode(false)
+    setDemoProfileName('Demo User')
     setSession(null)
   }
 
   const openDemo = () => {
     setDemoMode(true)
+    setDemoProfileName('Demo User')
     setActiveTab('home')
     setAuthFeedback({ tone: 'success', text: 'Mode demo dibuka.' })
+  }
+
+  const updateProfileName = async (name: string) => {
+    const cleanName = name.trim()
+
+    if (!cleanName) {
+      return { ok: false, message: 'Nama tidak boleh kosong.' }
+    }
+
+    if (demoMode) {
+      setDemoProfileName(cleanName)
+      return { ok: true, message: 'Nama profile diperbarui.' }
+    }
+
+    if (!supabase) {
+      return { ok: false, message: 'Profile belum bisa diperbarui.' }
+    }
+
+    const { data: updated, error } = await supabase.auth.updateUser({
+      data: {
+        full_name: cleanName,
+      },
+    })
+
+    if (error) {
+      return { ok: false, message: 'Nama profile belum bisa diubah.' }
+    }
+
+    if (updated.user && session) {
+      setSession({
+        ...session,
+        user: updated.user,
+      })
+    }
+
+    return { ok: true, message: 'Nama profile diperbarui.' }
+  }
+
+  const updateProfilePassword = async (password: string) => {
+    const cleanPassword = password.trim()
+
+    if (cleanPassword.length < 6) {
+      return { ok: false, message: 'Password minimal 6 karakter.' }
+    }
+
+    if (demoMode) {
+      return { ok: true, message: 'Password demo berhasil diubah.' }
+    }
+
+    if (!supabase) {
+      return { ok: false, message: 'Password belum bisa diubah.' }
+    }
+
+    const { error } = await supabase.auth.updateUser({
+      password: cleanPassword,
+    })
+
+    if (error) {
+      return { ok: false, message: 'Password belum bisa diubah.' }
+    }
+
+    return { ok: true, message: 'Password berhasil diubah.' }
   }
 
   if (!session && !demoMode && supabaseEnabled) {
@@ -312,7 +379,7 @@ export default function App() {
             </div>
             <div>
               <h1>MyBudget</h1>
-              <p>Budget pribadi</p>
+              <p>{isAdmin ? 'Admin panel' : userName}</p>
             </div>
           </div>
 
@@ -642,6 +709,15 @@ export default function App() {
                 />
               )}
 
+              {activeTab === 'profile' && !isAdmin && (
+                <ProfilePanel
+                  userName={userName}
+                  email={appUserEmail ?? '-'}
+                  onSaveName={updateProfileName}
+                  onSavePassword={updateProfilePassword}
+                />
+              )}
+
               {activeTab === 'setup' && isAdmin && (
                 <>
                   <AdminPanel
@@ -772,6 +848,90 @@ function WalletPanel({
             <EmptyState icon={Wallet} title="Belum ada dompet" description="Tambahkan dompet pertama." />
           )}
         </div>
+      </section>
+    </>
+  )
+}
+
+function ProfilePanel({
+  userName,
+  email,
+  onSaveName,
+  onSavePassword,
+}: {
+  userName: string
+  email: string
+  onSaveName: (name: string) => Promise<{ ok: boolean; message: string }>
+  onSavePassword: (password: string) => Promise<{ ok: boolean; message: string }>
+}) {
+  const [name, setName] = useState(userName)
+  const [password, setPassword] = useState('')
+  const [message, setMessage] = useState('')
+
+  useEffect(() => {
+    setName(userName)
+  }, [userName])
+
+  return (
+    <>
+      <section className="card profile-hero">
+        <div className="profile-avatar">{userName.slice(0, 1).toUpperCase()}</div>
+        <div className="profile-copy">
+          <p className="profile-label">Profile</p>
+          <h2>{userName}</h2>
+          <span>{email}</span>
+        </div>
+      </section>
+
+      <section className="card">
+        <div className="section-title">
+          <h2>Ubah nama</h2>
+          <UserCircle2 size={18} />
+        </div>
+        <form
+          className="form-grid"
+          onSubmit={async (event) => {
+            event.preventDefault()
+            const result = await onSaveName(name)
+            setMessage(result.message)
+          }}
+        >
+          <label className="field-block">
+            <span>Nama profile</span>
+            <input value={name} onChange={(event) => setName(event.target.value)} placeholder="Nama kamu" />
+          </label>
+          <button className="primary-button">Simpan nama</button>
+        </form>
+      </section>
+
+      <section className="card">
+        <div className="section-title">
+          <h2>Ubah password</h2>
+          <Settings size={18} />
+        </div>
+        <form
+          className="form-grid"
+          onSubmit={async (event) => {
+            event.preventDefault()
+            const result = await onSavePassword(password)
+            setMessage(result.message)
+            if (result.ok) {
+              setPassword('')
+            }
+          }}
+        >
+          <label className="field-block">
+            <span>Password baru</span>
+            <input
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder="Minimal 6 karakter"
+            />
+          </label>
+          <button className="primary-button">Simpan password</button>
+        </form>
+        {message && <p className="small-note">{message}</p>}
       </section>
     </>
   )
