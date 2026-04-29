@@ -102,7 +102,7 @@ function toFriendlyAuthMessage(message: string, mode: 'login' | 'register') {
   if (text.includes('password should be at least')) return 'Password minimal 6 karakter.'
   if (text.includes('unable to validate email address')) return 'Format email belum benar.'
   if (text.includes('signup is disabled')) return 'Pendaftaran sedang ditutup.'
-  if (text.includes('network')) return 'Koneksi lagi bermasalah. Coba sebentar lagi.'
+  if (text.includes('network')) return 'Koneksi bermasalah. Silakan coba kembali.'
 
   return mode === 'login' ? 'Belum bisa masuk sekarang.' : 'Belum bisa daftar sekarang.'
 }
@@ -173,7 +173,7 @@ function budgetAlert(item: BudgetCategory) {
   const percent = Math.round((item.spent / item.limit) * 100)
   if (percent >= 100) return { tone: 'danger', label: 'Sudah lewat batas', percent }
   if (percent >= 90) return { tone: 'danger', label: 'Hampir habis', percent }
-  if (percent >= 80) return { tone: 'warning', label: 'Mulai mepet', percent }
+  if (percent >= 80) return { tone: 'warning', label: 'Perlu perhatian', percent }
   return { tone: 'safe', label: 'Masih aman', percent }
 }
 
@@ -284,7 +284,7 @@ export default function App() {
     session?.user.user_metadata.name ??
     currentMember?.name ??
     session?.user.email?.split('@')[0] ??
-    'Kamu'
+    'Pengguna'
 
   const memberOptions = useMemo(() => uniqueValues([userName, ...data.members.map((item) => item.name)]), [data.members, userName])
   const chartData = data.budgets.map((item) => ({ name: item.name, value: item.spent, color: item.color }))
@@ -381,7 +381,7 @@ export default function App() {
       if (error) {
         setAuthFeedback({ tone: 'error', text: toFriendlyAuthMessage(error.message, 'login') })
       } else {
-        setAuthFeedback({ tone: 'success', text: 'Sip, kamu sudah masuk.' })
+        setAuthFeedback({ tone: 'success', text: 'Berhasil masuk.' })
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : ''
@@ -414,7 +414,7 @@ export default function App() {
     setDemoMode(true)
     setDemoProfileName('Demo User')
     setActiveTab('home')
-    setAuthFeedback({ tone: 'success', text: 'Mode coba sudah siap.' })
+    setAuthFeedback({ tone: 'success', text: 'Akun demo siap digunakan.' })
   }
 
   const updateProfileName = async (name: string) => {
@@ -444,7 +444,7 @@ export default function App() {
   const updateProfilePassword = async (password: string) => {
     const cleanPassword = password.trim()
     if (cleanPassword.length < 6) return { ok: false, message: 'Password minimal 6 karakter.' }
-    if (demoMode) return { ok: true, message: 'Password demo sudah diganti.' }
+    if (demoMode) return { ok: true, message: 'Password akun demo sudah diubah.' }
     if (!supabase) return { ok: false, message: 'Password belum bisa diubah.' }
 
     const { error } = await supabase.auth.updateUser({ password: cleanPassword })
@@ -463,11 +463,11 @@ export default function App() {
             </div>
             <div>
               <p className="eyebrow">MyBudget</p>
-              <h1>Biar uang gampang dipantau</h1>
+              <h1>Kelola keuangan dengan rapi</h1>
             </div>
           </div>
 
-          <p className="auth-copy">Masuk dulu ya. Nanti semua catatan, anggaran, dompet, dan laporan ada di sini.</p>
+          <p className="auth-copy">Masuk untuk mengelola catatan, anggaran, dompet, aset, dan laporan keuangan.</p>
 
           <form className="auth-form" onSubmit={handleAuth}>
             <label>
@@ -490,11 +490,11 @@ export default function App() {
             />
 
             <button className="primary-button" disabled={authLoading}>
-              {authLoading ? 'Sebentar...' : 'Masuk'}
+              {authLoading ? 'Memproses...' : 'Masuk'}
             </button>
 
             <button type="button" className="demo-login-button" onClick={openDemo}>
-              Lihat contoh
+              Akun demo
             </button>
           </form>
 
@@ -502,12 +502,12 @@ export default function App() {
             <div className={`auth-feedback ${authFeedback.tone}`}>
               <strong>
                 {authFeedback.tone === 'loading'
-                  ? 'Sebentar ya'
+                  ? 'Sedang diproses'
                   : authFeedback.tone === 'error'
                     ? 'Belum berhasil'
                     : authFeedback.tone === 'success'
                       ? 'Berhasil'
-                      : 'Kabar'}
+                      : 'Informasi'}
               </strong>
               <p>{authFeedback.text}</p>
             </div>
@@ -550,14 +550,14 @@ export default function App() {
 
         <section className="content">
           {loading ? (
-            <div className="card">Lagi menyiapkan data kamu...</div>
+            <div className="card">Sedang menyiapkan data...</div>
           ) : !canUseApp ? (
             <section className="card access-card">
               <div className="section-title">
                 <h2>Akun belum aktif</h2>
                 <ShieldCheck size={18} />
               </div>
-              <p className="helper-text">Minta admin menambahkan email ini dulu ya.</p>
+              <p className="helper-text">Minta admin menambahkan email ini sebagai anggota.</p>
               <button className="primary-button" onClick={signOut}>
                 Keluar
               </button>
@@ -572,7 +572,7 @@ export default function App() {
                       <strong>{data.transactions.length}</strong>
                     </div>
                     <div>
-                      <span>Anggaran mepet</span>
+                      <span>Anggaran rawan</span>
                       <strong>{alerts.length}</strong>
                     </div>
                     <div>
@@ -610,8 +610,8 @@ export default function App() {
                           <TrendingUp size={18} />
                         </div>
                         <div>
-                          <strong>{totalSaved > 0 ? 'Masih ada ruang buat nabung' : 'Arus kas lagi ketat'}</strong>
-                          <p>{totalSaved > 0 ? `Masih bisa disisihkan ${currency(totalSaved)}.` : 'Coba cek pengeluaran terbesar minggu ini.'}</p>
+                          <strong>{totalSaved > 0 ? 'Masih ada ruang untuk menabung' : 'Arus kas perlu diperhatikan'}</strong>
+                          <p>{totalSaved > 0 ? `Masih dapat disisihkan ${currency(totalSaved)}.` : 'Periksa pengeluaran terbesar minggu ini.'}</p>
                         </div>
                       </article>
                       <article className="insight-card">
@@ -619,7 +619,7 @@ export default function App() {
                           {alerts.length ? <AlertTriangle size={18} /> : <CheckCircle2 size={18} />}
                         </div>
                         <div>
-                          <strong>{alerts.length ? `${alerts.length} kategori mulai mepet` : 'Anggaran masih aman'}</strong>
+                          <strong>{alerts.length ? `${alerts.length} kategori perlu perhatian` : 'Anggaran masih aman'}</strong>
                           <p>{alerts[0] ? `${alerts[0].budget.name} sudah ${alerts[0].percent}% terpakai.` : 'Belum ada kategori yang perlu perhatian khusus.'}</p>
                         </div>
                       </article>
@@ -629,7 +629,7 @@ export default function App() {
                         </div>
                         <div>
                           <strong>{dueRecurringCount ? `${dueRecurringCount} jadwal siap dicatat` : 'Transaksi rutin masih rapi'}</strong>
-                          <p>{dueRecurringCount ? 'Buka tab Catat buat masukkan transaksi rutin hari ini.' : 'Tagihan dan pemasukan rutin bisa ditambah kapan saja.'}</p>
+                          <p>{dueRecurringCount ? 'Buka halaman Catat untuk mencatat transaksi rutin hari ini.' : 'Tagihan dan pemasukan rutin dapat ditambahkan kapan saja.'}</p>
                         </div>
                       </article>
                     </div>
@@ -655,7 +655,7 @@ export default function App() {
                   <section className="card">
                     <div className="section-title">
                       <h2>Aksi cepat</h2>
-                      <span>Biar cepat</span>
+                      <span>Akses cepat</span>
                     </div>
                     <div className="quick-actions">
                       <button className="quick-action" onClick={() => setActiveTab('add')}>
@@ -692,7 +692,7 @@ export default function App() {
                         <FileText size={18} />
                         <div>
                           <strong>PDF</strong>
-                          <p>Rekap yang enak dibaca</p>
+                          <p>Rekap ringkas siap dibaca</p>
                         </div>
                       </button>
                       <button className="export-button" onClick={() => exportBudgetToExcel(exportPayload)}>
@@ -1238,7 +1238,7 @@ function ProfilePanel({
         >
           <label className="field-block">
             <span>Nama yang tampil</span>
-            <input value={name} onChange={(event) => setName(event.target.value)} placeholder="Nama kamu" />
+            <input value={name} onChange={(event) => setName(event.target.value)} placeholder="Nama pengguna" />
           </label>
           <button className="primary-button">Simpan nama</button>
         </form>
@@ -1688,7 +1688,7 @@ function AddTransactionPanel({
 
           {!accounts.length && (
             <div className="setup-guide">
-              <EmptyState icon={BadgeDollarSign} title="Tambah dompet dulu" description="Begitu ada dompet, transaksi langsung bisa dicatat. Tipe pengeluaran tetap bisa kamu pilih dari sini." />
+            <EmptyState icon={BadgeDollarSign} title="Tambahkan dompet terlebih dahulu" description="Setelah dompet tersedia, transaksi dapat langsung dicatat. Tipe pengeluaran tetap dapat dipilih di halaman ini." />
               <div className="setup-guide-actions">
                 <button type="button" className="soft-button" onClick={onOpenWallet}>
                   Buka dompet
@@ -1699,7 +1699,7 @@ function AddTransactionPanel({
 
           {accounts.length > 0 && !categories.length && form.type === 'expense' && (
             <div className="setup-guide compact-guide">
-              <EmptyState icon={Target} title="Anggaran belum dibuat" description="Pengeluaran tetap bisa dicatat. Kategorinya isi manual dulu, atau bikin anggaran biar lebih rapi." compact />
+              <EmptyState icon={Target} title="Anggaran belum dibuat" description="Pengeluaran tetap dapat dicatat. Kategori dapat diisi manual atau dipilih setelah anggaran dibuat." compact />
               <div className="setup-guide-actions">
                 <button type="button" className="soft-button" onClick={onOpenBudget}>
                   Buka anggaran
@@ -1804,7 +1804,7 @@ function AddTransactionPanel({
 
           <label className="field-block">
             <span>Catatan</span>
-            <textarea value={form.note} onChange={(event) => setForm((prev) => ({ ...prev, note: event.target.value }))} rows={3} placeholder="Boleh kosong kalau nggak perlu" />
+              <textarea value={form.note} onChange={(event) => setForm((prev) => ({ ...prev, note: event.target.value }))} rows={3} placeholder="Opsional" />
           </label>
 
           {form.type === 'transfer' && form.toAccount === form.account && <p className="small-note warning-note">Dompet asal dan tujuan harus beda.</p>}
@@ -1830,7 +1830,7 @@ function AddTransactionPanel({
         <div className="recurring-headline">
           <div>
             <strong>{dueRecurringCount ? `${dueRecurringCount} jadwal siap dicatat` : 'Belum ada yang jatuh tempo hari ini'}</strong>
-            <p>Pas buat gaji, tagihan bulanan, cicilan, atau transfer tabungan.</p>
+            <p>Gunakan untuk gaji, tagihan bulanan, cicilan, atau transfer tabungan.</p>
           </div>
           <div className="due-pill">
             <Clock3 size={16} />
@@ -1992,7 +1992,7 @@ function AddTransactionPanel({
               )
             })
           ) : (
-            <EmptyState icon={Repeat2} title="Belum ada transaksi rutin" description="Tambahkan dulu satu jadwal biar tagihan dan pemasukan tetap rapi." compact />
+            <EmptyState icon={Repeat2} title="Belum ada transaksi rutin" description="Tambahkan satu jadwal agar tagihan dan pemasukan rutin tercatat rapi." compact />
           )}
         </div>
       </section>
@@ -2131,7 +2131,7 @@ function SavingGoalsPanel({
             </article>
           ))
         ) : (
-          <EmptyState icon={Goal} title="Belum ada target tabungan" description="Tambahkan tujuan biar nabung terasa lebih jelas." compact />
+          <EmptyState icon={Goal} title="Belum ada target tabungan" description="Tambahkan tujuan agar progres tabungan lebih mudah dipantau." compact />
         )}
       </div>
     </section>
