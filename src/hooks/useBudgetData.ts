@@ -251,6 +251,40 @@ export function useBudgetData(userId?: string, userEmail?: string, demoMode = fa
       const memberMap = new Map([...(ownerMembers ?? []), ...(emailMembers ?? [])].map((item) => [item.id, item]))
       const members = Array.from(memberMap.values())
 
+      const loadedTransactions =
+        transactions?.map((item) => {
+          const decoded = decodeTransactionNote(item.note)
+
+          return {
+            id: item.id,
+            title: item.title,
+            amount: Number(item.amount),
+            type: item.type,
+            category: item.category,
+            account: item.account_name,
+            toAccount: item.to_account_name ?? decoded.toAccount,
+            member: item.member_name ?? decoded.member,
+            date: item.date,
+            note: decoded.note,
+          }
+        }) ?? []
+
+      const loadedBudgets =
+        budgets?.map((item) => ({
+          id: item.id,
+          name: item.name,
+          limit: Number(item.limit_amount),
+          color: item.color ?? '#6346f7',
+          rollover: Boolean(item.rollover_enabled),
+        })) ?? []
+
+      const reconciledBudgets = loadedBudgets.map((item) => ({
+        ...item,
+        spent: loadedTransactions
+          .filter((transaction) => transaction.type === 'expense' && transaction.category === item.name)
+          .reduce((sum, transaction) => sum + transaction.amount, 0),
+      }))
+
       setData({
         period: periods?.[0]
           ? { label: periods[0].label, start: periods[0].start_date, end: periods[0].end_date }
@@ -263,32 +297,8 @@ export function useBudgetData(userId?: string, userEmail?: string, demoMode = fa
             color: item.color ?? accountColors[index % accountColors.length],
           })) ?? [],
         members: members.map((item) => ({ id: item.id, name: item.name, email: item.email, role: item.role })),
-        budgets:
-          budgets?.map((item) => ({
-            id: item.id,
-            name: item.name,
-            limit: Number(item.limit_amount),
-            spent: Number(item.spent_amount),
-            color: item.color ?? '#6346f7',
-            rollover: Boolean(item.rollover_enabled),
-          })) ?? [],
-        transactions:
-          transactions?.map((item) => {
-            const decoded = decodeTransactionNote(item.note)
-
-            return {
-              id: item.id,
-              title: item.title,
-              amount: Number(item.amount),
-              type: item.type,
-              category: item.category,
-              account: item.account_name,
-              toAccount: item.to_account_name ?? decoded.toAccount,
-              member: item.member_name ?? decoded.member,
-              date: item.date,
-              note: decoded.note,
-            }
-          }) ?? [],
+        budgets: reconciledBudgets,
+        transactions: loadedTransactions,
       })
       setLoading(false)
     }

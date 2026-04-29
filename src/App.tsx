@@ -550,7 +550,7 @@ export default function App() {
                   <section className="spotlight-card">
                     <div>
                       <span className="spotlight-label">Pengeluaran bulan ini</span>
-                      <strong>{currency(summary.totalSpent)}</strong>
+                      <strong>{currency(summary.totalExpense)}</strong>
                       <p>dari total anggaran {currency(summary.totalBudget)}</p>
                     </div>
                     <div className="progress-ring">
