@@ -28,6 +28,16 @@ create table if not exists public.budget_periods (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.budget_period_entries (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  label text not null,
+  start_date date not null,
+  end_date date not null,
+  is_active boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
 create table if not exists public.members (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
@@ -52,17 +62,21 @@ create table if not exists public.transactions (
 
 alter table public.transactions add column if not exists to_account_name text;
 alter table public.transactions add column if not exists member_name text;
+alter table public.transactions add column if not exists period_id uuid references public.budget_period_entries(id) on delete set null;
 alter table public.budget_categories add column if not exists rollover_enabled boolean not null default false;
+alter table public.budget_categories add column if not exists period_id uuid references public.budget_period_entries(id) on delete set null;
 
 alter table public.accounts enable row level security;
 alter table public.budget_categories enable row level security;
 alter table public.budget_periods enable row level security;
+alter table public.budget_period_entries enable row level security;
 alter table public.members enable row level security;
 alter table public.transactions enable row level security;
 
 drop policy if exists "accounts owner access" on public.accounts;
 drop policy if exists "budget categories owner access" on public.budget_categories;
 drop policy if exists "budget periods owner access" on public.budget_periods;
+drop policy if exists "budget period entries owner access" on public.budget_period_entries;
 drop policy if exists "members owner access" on public.members;
 drop policy if exists "members can read own email" on public.members;
 drop policy if exists "transactions owner access" on public.transactions;
@@ -74,6 +88,9 @@ create policy "budget categories owner access" on public.budget_categories
 for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 create policy "budget periods owner access" on public.budget_periods
+for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+create policy "budget period entries owner access" on public.budget_period_entries
 for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 create policy "members owner access" on public.members

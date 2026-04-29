@@ -2,10 +2,19 @@ import type { BudgetData } from '../types'
 
 export const initialBudgetData: BudgetData = {
   period: {
+    id: 'period-1',
     label: 'April 2026',
     start: '2026-04-01',
     end: '2026-04-30',
   },
+  periods: [
+    {
+      id: 'period-1',
+      label: 'April 2026',
+      start: '2026-04-01',
+      end: '2026-04-30',
+    },
+  ],
   accounts: [
     { id: 'acc-1', name: 'BCA', balance: 4250000, color: '#6346f7' },
     { id: 'acc-2', name: 'SeaBank', balance: 2875000, color: '#13b981' },
@@ -15,14 +24,15 @@ export const initialBudgetData: BudgetData = {
     { id: 'mem-1', name: 'Admin Banyuwangi', email: 'admin@kunci.cloud', role: 'Admin' },
   ],
   budgets: [
-    { id: 'bud-1', name: 'Makan', limit: 1800000, spent: 950000, color: '#6346f7', rollover: false },
-    { id: 'bud-2', name: 'Transport', limit: 900000, spent: 475000, color: '#06b6d4', rollover: true },
-    { id: 'bud-3', name: 'Tagihan', limit: 2200000, spent: 1460000, color: '#ef4444', rollover: true },
-    { id: 'bud-4', name: 'Hiburan', limit: 750000, spent: 325000, color: '#f59e0b', rollover: false },
+    { id: 'bud-1', periodId: 'period-1', name: 'Makan', limit: 1800000, spent: 950000, color: '#6346f7', rollover: false },
+    { id: 'bud-2', periodId: 'period-1', name: 'Transport', limit: 900000, spent: 475000, color: '#06b6d4', rollover: true },
+    { id: 'bud-3', periodId: 'period-1', name: 'Tagihan', limit: 2200000, spent: 1460000, color: '#ef4444', rollover: true },
+    { id: 'bud-4', periodId: 'period-1', name: 'Hiburan', limit: 750000, spent: 325000, color: '#f59e0b', rollover: false },
   ],
   transactions: [
     {
       id: 'trx-1',
+      periodId: 'period-1',
       title: 'Gaji Bulanan',
       amount: 8500000,
       type: 'income',
@@ -34,6 +44,7 @@ export const initialBudgetData: BudgetData = {
     },
     {
       id: 'trx-2',
+      periodId: 'period-1',
       title: 'Makan Siang',
       amount: 68000,
       type: 'expense',
@@ -45,6 +56,7 @@ export const initialBudgetData: BudgetData = {
     },
     {
       id: 'trx-3',
+      periodId: 'period-1',
       title: 'BBM Motor',
       amount: 120000,
       type: 'expense',
@@ -56,6 +68,7 @@ export const initialBudgetData: BudgetData = {
     },
     {
       id: 'trx-4',
+      periodId: 'period-1',
       title: 'Transfer Tabungan',
       amount: 500000,
       type: 'transfer',
@@ -68,6 +81,7 @@ export const initialBudgetData: BudgetData = {
     },
     {
       id: 'trx-5',
+      periodId: 'period-1',
       title: 'Netflix',
       amount: 186000,
       type: 'expense',

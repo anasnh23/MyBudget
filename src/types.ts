@@ -18,6 +18,7 @@ export type Member = {
 
 export type BudgetCategory = {
   id: string
+  periodId: string
   name: string
   limit: number
   spent: number
@@ -27,6 +28,7 @@ export type BudgetCategory = {
 
 export type TransactionItem = {
   id: string
+  periodId: string
   title: string
   amount: number
   type: TransactionType
@@ -81,6 +83,7 @@ export type AssetItem = {
 }
 
 export type BudgetPeriod = {
+  id: string
   label: string
   start: string
   end: string
@@ -88,6 +91,7 @@ export type BudgetPeriod = {
 
 export type BudgetData = {
   period: BudgetPeriod
+  periods: BudgetPeriod[]
   accounts: Account[]
   members: Member[]
   budgets: BudgetCategory[]

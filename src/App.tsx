@@ -39,7 +39,7 @@ import {
   X,
 } from 'lucide-react'
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts'
-import { compactDate, currency, todayIso } from './lib/format'
+import { addDays, compactDate, currency, todayIso } from './lib/format'
 import { exportBudgetToExcel, exportBudgetToPdf } from './lib/export'
 import { useBudgetData } from './hooks/useBudgetData'
 import { supabase, supabaseEnabled } from './lib/supabase'
@@ -108,7 +108,7 @@ function toFriendlyAuthMessage(message: string, mode: 'login' | 'register') {
   return mode === 'login' ? 'Belum bisa masuk sekarang.' : 'Belum bisa daftar sekarang.'
 }
 
-function defaultTransactionDraft(accounts: string[], categories: string[], member: string): Omit<TransactionItem, 'id'> {
+function defaultTransactionDraft(accounts: string[], categories: string[], member: string): Omit<TransactionItem, 'id' | 'periodId'> {
   return {
     title: '',
     amount: 0,
@@ -194,6 +194,7 @@ export default function App() {
   const [editingBudget, setEditingBudget] = useState<BudgetCategory | null>(null)
   const [editingGoal, setEditingGoal] = useState<SavingGoal | null>(null)
   const [editingAsset, setEditingAsset] = useState<AssetItem | null>(null)
+  const [budgetActionMessage, setBudgetActionMessage] = useState<SaveResult | null>(null)
 
   useEffect(() => {
     if (!supabase) return
@@ -225,7 +226,9 @@ export default function App() {
     addTransaction,
     updateTransaction,
     updatePeriod,
+    selectPeriod,
     applyBudgetRollover,
+    undoBudgetRollover,
     deleteTransaction,
     addRecurringTransaction,
     updateRecurringTransaction,
@@ -237,6 +240,7 @@ export default function App() {
     addAsset,
     updateAsset,
     deleteAsset,
+    lastRolloverSnapshot,
   } = useBudgetData(appUserId, appUserEmail, demoMode)
 
   const isSeedAdmin = session?.user.email?.toLowerCase() === 'admin@kunci.cloud'
@@ -809,7 +813,12 @@ export default function App() {
 
               {activeTab === 'budget' && !isAdmin && (
                 <>
-                  <BudgetPeriodPanel start={data.period.start} end={data.period.end} label={data.period.label} onSave={updatePeriod} />
+                  <BudgetPeriodPanel
+                    periods={data.periods}
+                    activePeriodId={data.period.id}
+                    onSelectPeriod={selectPeriod}
+                    onSave={updatePeriod}
+                  />
 
                   <section className="stats-grid">
                     <MetricCard icon={CircleDollarSign} label="Total anggaran" value={currency(summary.totalBudget)} tone="violet" />
@@ -824,12 +833,15 @@ export default function App() {
                     onSubmit={async (payload) => {
                       if (editingBudget) {
                         const result = await updateBudget(editingBudget.id, payload)
+                        setBudgetActionMessage(result)
                         if (result.ok) {
                           setEditingBudget(null)
                         }
                         return result
                       } else {
-                        return addBudget(payload)
+                        const result = await addBudget(payload)
+                        setBudgetActionMessage(result)
+                        return result
                       }
                     }}
                   />
@@ -839,11 +851,48 @@ export default function App() {
                       <h2>Daftar anggaran</h2>
                       <div className="section-actions">
                         <span>{data.budgets.length} kategori</span>
-                        <button className="mini-action-button" onClick={applyBudgetRollover}>
+                        <button
+                          className="mini-action-button"
+                          onClick={async () => {
+                            const confirmed = window.confirm(
+                              'Pakai rollover sekarang? Sisa atau selisih tiap anggaran akan dipindahkan dan nilai terpakai akan direset ke 0.',
+                            )
+
+                            if (!confirmed) return
+
+                            const result = await applyBudgetRollover()
+                            setBudgetActionMessage(result)
+                          }}
+                        >
                           Pakai rollover
+                        </button>
+                        <button
+                          className="row-action-button muted"
+                          disabled={!lastRolloverSnapshot}
+                          onClick={async () => {
+                            const confirmed = window.confirm('Batalkan rollover terakhir dan kembalikan limit anggaran seperti sebelum rollover?')
+
+                            if (!confirmed) return
+
+                            const result = await undoBudgetRollover()
+                            setBudgetActionMessage(result)
+                          }}
+                        >
+                          <RefreshCw size={14} />
+                          Batalkan rollover
                         </button>
                       </div>
                     </div>
+                    {budgetActionMessage && (
+                      <p className={budgetActionMessage.ok ? 'small-note success-note budget-action-note' : 'small-note warning-note budget-action-note'}>
+                        {budgetActionMessage.message}
+                      </p>
+                    )}
+                    {lastRolloverSnapshot && (
+                      <p className="small-note budget-action-note">
+                        Snapshot rollover tersimpan untuk periode {lastRolloverSnapshot.period.label}. Gunakan tombol batalkan rollover kalau tadi salah pencet.
+                      </p>
+                    )}
                     <div className="budget-list">
                       {data.budgets.length ? (
                         data.budgets.map((item) => {
@@ -1438,38 +1487,68 @@ function BudgetAlertPanel({
 }
 
 function BudgetPeriodPanel({
-  start,
-  end,
-  label,
+  periods,
+  activePeriodId,
+  onSelectPeriod,
   onSave,
 }: {
-  start: string
-  end: string
-  label: string
-  onSave: (payload: { label: string; start: string; end: string }) => Promise<void>
+  periods: Array<{ id: string; label: string; start: string; end: string }>
+  activePeriodId: string
+  onSelectPeriod: (periodId: string) => Promise<SaveResult>
+  onSave: (payload: { label: string; start: string; end: string }, mode?: 'reset' | 'rollover') => Promise<SaveResult>
 }) {
-  const [period, setPeriod] = useState({ start, end, label })
+  const activePeriod = periods.find((item) => item.id === activePeriodId) ?? periods[0]
+  const [period, setPeriod] = useState({ start: '', end: '', label: '' })
+  const [mode, setMode] = useState<'reset' | 'rollover'>('reset')
+  const [message, setMessage] = useState<SaveResult | null>(null)
 
   useEffect(() => {
-    setPeriod({ start, end, label })
-  }, [start, end, label])
+    const nextStart = activePeriod?.end ? addDays(activePeriod.end, 1) : todayIso()
+    const nextEnd = activePeriod?.end ? addDays(activePeriod.end, 30) : todayIso()
+    setPeriod({
+      label: '',
+      start: nextStart,
+      end: nextEnd,
+    })
+    setMessage(null)
+    setMode('reset')
+  }, [activePeriodId, activePeriod?.label, activePeriod?.end])
 
   return (
     <section className="card">
       <div className="section-title">
-          <h2>Periode anggaran</h2>
+        <h2>Periode anggaran</h2>
         <CalendarRange size={18} />
+      </div>
+      <div className="form-grid">
+        <label className="field-block">
+          <span>Periode aktif</span>
+          <select
+            value={activePeriodId}
+            onChange={async (event) => {
+              const result = await onSelectPeriod(event.target.value)
+              setMessage(result)
+            }}
+          >
+            {periods.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.label} ({item.start} - {item.end})
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
       <form
         className="form-grid"
         onSubmit={async (event) => {
           event.preventDefault()
-          await onSave(period)
+          const result = await onSave(period, mode)
+          setMessage(result)
         }}
       >
         <label className="field-block">
-          <span>Nama periode</span>
-          <input value={period.label} onChange={(event) => setPeriod((prev) => ({ ...prev, label: event.target.value }))} placeholder="April 2026" />
+          <span>Periode baru</span>
+          <input value={period.label} onChange={(event) => setPeriod((prev) => ({ ...prev, label: event.target.value }))} placeholder="Mei 2026" />
         </label>
         <div className="split-inputs">
           <label className="field-block">
@@ -1481,7 +1560,15 @@ function BudgetPeriodPanel({
             <input type="date" value={period.end} onChange={(event) => setPeriod((prev) => ({ ...prev, end: event.target.value }))} />
           </label>
         </div>
-        <button className="primary-button">Simpan periode</button>
+        <label className="field-block">
+          <span>Mode anggaran</span>
+          <select value={mode} onChange={(event) => setMode(event.target.value as 'reset' | 'rollover')}>
+            <option value="reset">Buat baru dari nominal dasar</option>
+            <option value="rollover">Bawa sisa kategori rollover</option>
+          </select>
+        </label>
+        <button className="primary-button">Buat dan pindah periode</button>
+        {message && <p className={message.ok ? 'small-note success-note' : 'small-note warning-note'}>{message.message}</p>}
       </form>
     </section>
   )
@@ -1516,8 +1603,8 @@ function AddTransactionPanel({
   dueRecurringCount: number
   editingTransaction: TransactionItem | null
   editingRecurring: RecurringTransaction | null
-  onCreate: (payload: Omit<TransactionItem, 'id'>) => Promise<SaveResult>
-  onUpdate: (id: string, payload: Omit<TransactionItem, 'id'>) => Promise<SaveResult>
+  onCreate: (payload: Omit<TransactionItem, 'id' | 'periodId'>) => Promise<SaveResult>
+  onUpdate: (id: string, payload: Omit<TransactionItem, 'id' | 'periodId'>) => Promise<SaveResult>
   onCancelEdit: () => void
   onOpenWallet: () => void
   onOpenBudget: () => void

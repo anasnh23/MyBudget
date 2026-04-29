@@ -1266,6 +1266,11 @@ textarea:focus {
   color: #3559c7;
 }
 
+.row-action-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .row-action-button.danger {
   background: #fff1f2;
   color: #dc2626;
@@ -1286,6 +1291,10 @@ textarea:focus {
   color: #3559c7;
   font-size: 0.82rem;
   font-weight: 700;
+}
+
+.budget-action-note {
+  margin-top: 10px;
 }
 
 .compact-ghost {
