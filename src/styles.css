@@ -624,7 +624,7 @@ button {
 .split-inputs,
 .toggle-grid {
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 
 .split-inputs {
@@ -635,16 +635,32 @@ button {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.entry-mode-toggle {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 input,
 select,
 textarea {
   width: 100%;
+  min-height: 48px;
   border: 1px solid var(--field-border);
   background: var(--field-bg);
-  border-radius: 14px;
-  padding: 13px 14px;
+  border-radius: 13px;
+  padding: 12px 14px;
   color: var(--text-main);
+  font-size: 0.95rem;
+  line-height: 1.35;
   outline: none;
+}
+
+select {
+  cursor: pointer;
+  text-overflow: ellipsis;
+}
+
+option {
+  font-size: 0.95rem;
 }
 
 input::placeholder,
@@ -663,8 +679,8 @@ textarea:focus {
 .toggle-pill,
 .ghost-button,
 .demo-login-button {
-  border-radius: 14px;
-  padding: 13px 16px;
+  border-radius: 13px;
+  padding: 12px 14px;
   font-weight: 700;
 }
 
@@ -685,9 +701,15 @@ textarea:focus {
 }
 
 .toggle-pill {
+  min-width: 0;
+  min-height: 46px;
   background: #f4f7ff;
   color: #62708b;
   border: 1px solid transparent;
+  font-size: 0.9rem;
+  line-height: 1.15;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .toggle-pill.active {
@@ -999,7 +1021,8 @@ textarea:focus {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 0 14px;
+  min-height: 48px;
+  padding: 0 12px;
   border-radius: 14px;
   border: 1px solid #dbe5fb;
   background: #f9fbff;
@@ -1030,11 +1053,14 @@ textarea:focus {
 
 .filter-pill {
   white-space: nowrap;
-  padding: 10px 14px;
+  min-height: 40px;
+  padding: 9px 13px;
   border-radius: 999px;
   background: #f4f7ff;
   color: #62708b;
   border: 1px solid transparent;
+  font-size: 0.88rem;
+  font-weight: 700;
 }
 
 .filter-pill.active {
@@ -1063,12 +1089,12 @@ textarea:focus {
 
 .field-block {
   display: grid;
-  gap: 8px;
+  gap: 7px;
 }
 
 .field-block span {
   color: #536179;
-  font-size: 0.84rem;
+  font-size: 0.82rem;
   font-weight: 600;
 }
 
@@ -1101,11 +1127,13 @@ textarea:focus {
 }
 
 .theme-option {
-  padding: 13px 14px;
+  min-height: 46px;
+  padding: 12px 14px;
   border-radius: 14px;
   background: #f4f7ff;
   color: #62708b;
   font-weight: 700;
+  font-size: 0.92rem;
 }
 
 .theme-option.active {
@@ -1440,11 +1468,13 @@ textarea:focus {
 }
 
 .soft-button {
-  padding: 11px 16px;
+  min-height: 42px;
+  padding: 10px 15px;
   border-radius: 999px;
   background: #f4f0ff;
   color: #5b39d7;
   font-weight: 700;
+  font-size: 0.9rem;
 }
 
 .empty-state {
@@ -1463,13 +1493,13 @@ textarea:focus {
   left: 50%;
   bottom: max(12px, env(safe-area-inset-bottom));
   z-index: 20;
-  width: min(430px, calc(100% - 24px));
+  width: min(430px, calc(100% - 20px));
   transform: translateX(-50%);
   margin: 0;
-  padding: 8px;
+  padding: 7px;
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 6px;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
   border-radius: 24px;
   background: rgba(255, 255, 255, 0.92);
   border: 1px solid rgba(255, 255, 255, 0.82);
@@ -1478,9 +1508,9 @@ textarea:focus {
 
 .nav-item {
   min-width: 0;
-  min-height: 58px;
-  padding: 8px 4px;
-  border-radius: 16px;
+  min-height: 54px;
+  padding: 7px 2px;
+  border-radius: 14px;
   background: transparent;
   color: #76839b;
   display: grid;
@@ -1489,7 +1519,7 @@ textarea:focus {
 }
 
 .nav-item span {
-  font-size: 0.7rem;
+  font-size: clamp(0.58rem, 2.1vw, 0.68rem);
   line-height: 1.1;
   max-width: 100%;
   overflow: hidden;
@@ -1819,7 +1849,17 @@ textarea:focus {
   }
 
   .bottom-nav {
-    width: calc(100% - 20px);
+    width: calc(100% - 14px);
+  }
+
+  .toggle-grid {
+    gap: 8px;
+  }
+
+  .toggle-pill {
+    min-height: 44px;
+    padding: 10px 8px;
+    font-size: 0.82rem;
   }
 
   .export-actions,

@@ -62,7 +62,7 @@ const baseNavItems = [
   { key: 'home', label: 'Ringkas', icon: LayoutGrid },
   { key: 'history', label: 'Riwayat', icon: ReceiptText },
   { key: 'add', label: 'Catat', icon: BadgeDollarSign },
-  { key: 'budget', label: 'Budget', icon: Target },
+  { key: 'budget', label: 'Anggaran', icon: Target },
   { key: 'wallet', label: 'Dompet', icon: Wallet },
   { key: 'asset', label: 'Aset', icon: CircleDollarSign },
   { key: 'profile', label: 'Profil', icon: UserCircle2 },
@@ -171,7 +171,7 @@ function budgetAlert(item: BudgetCategory) {
   }
 
   const percent = Math.round((item.spent / item.limit) * 100)
-  if (percent >= 100) return { tone: 'danger', label: 'Sudah lewat limit', percent }
+  if (percent >= 100) return { tone: 'danger', label: 'Sudah lewat batas', percent }
   if (percent >= 90) return { tone: 'danger', label: 'Hampir habis', percent }
   if (percent >= 80) return { tone: 'warning', label: 'Mulai mepet', percent }
   return { tone: 'safe', label: 'Masih aman', percent }
@@ -367,7 +367,7 @@ export default function App() {
     setAuthFeedback({ tone: 'loading', text: 'Lagi masuk...' })
 
     if (!supabaseEnabled || !supabase) {
-      setAuthFeedback({ tone: 'error', text: 'Login belum siap sekarang.' })
+      setAuthFeedback({ tone: 'error', text: 'Belum bisa masuk sekarang.' })
       setAuthLoading(false)
       return
     }
@@ -414,7 +414,7 @@ export default function App() {
     setDemoMode(true)
     setDemoProfileName('Demo User')
     setActiveTab('home')
-    setAuthFeedback({ tone: 'success', text: 'Mode demo dibuka.' })
+    setAuthFeedback({ tone: 'success', text: 'Mode coba sudah siap.' })
   }
 
   const updateProfileName = async (name: string) => {
@@ -467,7 +467,7 @@ export default function App() {
             </div>
           </div>
 
-          <p className="auth-copy">Masuk dulu ya. Nanti semua catatan, budget, dompet, dan laporan ada di sini.</p>
+          <p className="auth-copy">Masuk dulu ya. Nanti semua catatan, anggaran, dompet, dan laporan ada di sini.</p>
 
           <form className="auth-form" onSubmit={handleAuth}>
             <label>
@@ -494,13 +494,21 @@ export default function App() {
             </button>
 
             <button type="button" className="demo-login-button" onClick={openDemo}>
-              Coba dulu
+              Lihat contoh
             </button>
           </form>
 
           {authFeedback.text && (
             <div className={`auth-feedback ${authFeedback.tone}`}>
-              <strong>{authFeedback.tone === 'error' ? 'Belum berhasil' : authFeedback.tone === 'success' ? 'Berhasil' : 'Info'}</strong>
+              <strong>
+                {authFeedback.tone === 'loading'
+                  ? 'Sebentar ya'
+                  : authFeedback.tone === 'error'
+                    ? 'Belum berhasil'
+                    : authFeedback.tone === 'success'
+                      ? 'Berhasil'
+                      : 'Kabar'}
+              </strong>
               <p>{authFeedback.text}</p>
             </div>
           )}
@@ -542,7 +550,7 @@ export default function App() {
 
         <section className="content">
           {loading ? (
-            <div className="card">Lagi ambil data budget...</div>
+            <div className="card">Lagi menyiapkan data kamu...</div>
           ) : !canUseApp ? (
             <section className="card access-card">
               <div className="section-title">
@@ -564,7 +572,7 @@ export default function App() {
                       <strong>{data.transactions.length}</strong>
                     </div>
                     <div>
-                      <span>Budget mepet</span>
+                      <span>Anggaran mepet</span>
                       <strong>{alerts.length}</strong>
                     </div>
                     <div>
@@ -577,7 +585,7 @@ export default function App() {
                     <div>
                       <span className="spotlight-label">Pengeluaran bulan ini</span>
                       <strong>{currency(summary.totalSpent)}</strong>
-                      <p>dari total budget {currency(summary.totalBudget)}</p>
+                      <p>dari total anggaran {currency(summary.totalBudget)}</p>
                     </div>
                     <div className="progress-ring">
                       <span>{Math.round(summary.budgetUsage)}%</span>
@@ -587,7 +595,7 @@ export default function App() {
                   <section className="stats-grid">
                     <MetricCard icon={Wallet} label="Saldo sekarang" value={currency(summary.totalBalance)} tone="violet" />
                     <MetricCard icon={ArrowDownLeft} label="Pemasukan" value={currency(summary.totalIncome)} tone="green" />
-                    <MetricCard icon={ArrowUpRight} label="Sisa budget" value={currency(summary.remainingBudget)} tone="sky" />
+                    <MetricCard icon={ArrowUpRight} label="Sisa anggaran" value={currency(summary.remainingBudget)} tone="sky" />
                     <MetricCard icon={PiggyBank} label="Potensi tabungan" value={currency(totalSaved)} tone="amber" />
                   </section>
 
@@ -611,7 +619,7 @@ export default function App() {
                           {alerts.length ? <AlertTriangle size={18} /> : <CheckCircle2 size={18} />}
                         </div>
                         <div>
-                          <strong>{alerts.length ? `${alerts.length} kategori mulai mepet` : 'Budget masih aman'}</strong>
+                          <strong>{alerts.length ? `${alerts.length} kategori mulai mepet` : 'Anggaran masih aman'}</strong>
                           <p>{alerts[0] ? `${alerts[0].budget.name} sudah ${alerts[0].percent}% terpakai.` : 'Belum ada kategori yang perlu perhatian khusus.'}</p>
                         </div>
                       </article>
@@ -660,15 +668,15 @@ export default function App() {
                       <button className="quick-action" onClick={() => setActiveTab('budget')}>
                         <Target size={18} />
                         <div>
-                          <strong>Atur budget</strong>
-                          <p>Cek limit, alert, dan rollover</p>
+                          <strong>Atur anggaran</strong>
+                          <p>Cek batas, peringatan, dan rollover</p>
                         </div>
                       </button>
                       <button className="quick-action" onClick={() => setActiveTab('history')}>
                         <CreditCard size={18} />
                         <div>
                           <strong>Lihat riwayat</strong>
-                          <p>Filter lebih detail dan ubah transaksi</p>
+                          <p>Saring data dan ubah transaksi</p>
                         </div>
                       </button>
                     </div>
@@ -729,7 +737,7 @@ export default function App() {
                         </div>
                       </>
                     ) : (
-                      <EmptyState icon={Target} title="Belum ada budget" description="Tambahkan budget dulu supaya grafiknya muncul." />
+                      <EmptyState icon={Target} title="Belum ada anggaran" description="Tambahkan anggaran dulu supaya grafiknya muncul." />
                     )}
                   </section>
 
@@ -832,7 +840,7 @@ export default function App() {
                   <BudgetPeriodPanel start={data.period.start} end={data.period.end} label={data.period.label} onSave={updatePeriod} />
 
                   <section className="stats-grid">
-                    <MetricCard icon={CircleDollarSign} label="Total budget" value={currency(summary.totalBudget)} tone="violet" />
+                    <MetricCard icon={CircleDollarSign} label="Total anggaran" value={currency(summary.totalBudget)} tone="violet" />
                     <MetricCard icon={PiggyBank} label="Sisa dana" value={currency(summary.remainingBudget)} tone="green" />
                   </section>
 
@@ -853,11 +861,11 @@ export default function App() {
 
                   <section className="card">
                     <div className="section-title">
-                      <h2>Daftar budget</h2>
+                      <h2>Daftar anggaran</h2>
                       <div className="section-actions">
                         <span>{data.budgets.length} kategori</span>
                         <button className="mini-action-button" onClick={applyBudgetRollover}>
-                          Terapkan rollover
+                          Pakai rollover
                         </button>
                       </div>
                     </div>
@@ -881,7 +889,7 @@ export default function App() {
                                 <div className={`progress-fill ${alert.tone}`} style={{ width: `${pct}%`, background: item.color }} />
                               </div>
                               <div className="budget-footer">
-                                <span>{item.rollover ? 'Rollover aktif' : 'Tanpa rollover'}</span>
+                                <span>{item.rollover ? 'Rollover menyala' : 'Rollover mati'}</span>
                                 <button className="row-action-button muted" onClick={() => setEditingBudget(item)}>
                                   <PencilLine size={14} />
                                   Ubah
@@ -891,7 +899,7 @@ export default function App() {
                           )
                         })
                       ) : (
-                        <EmptyState icon={Target} title="Belum ada budget" description="Tambahkan budget dulu." />
+                        <EmptyState icon={Target} title="Belum ada anggaran" description="Tambahkan anggaran dulu." />
                       )}
                     </div>
                   </section>
@@ -1087,7 +1095,7 @@ function HistoryFilterPanel({
           </select>
         </label>
         <button className="soft-button reset-filter-button" onClick={() => onChange({ type: 'all', query: '', account: 'all', category: 'all', member: 'all', startDate: '', endDate: '' })}>
-          Reset filter
+          Bersihkan filter
         </button>
       </div>
     </div>
@@ -1207,7 +1215,7 @@ function ProfilePanel({
         </div>
         <div className="theme-toggle">
           <button className={themeMode === 'default' ? 'theme-option active' : 'theme-option'} onClick={() => onChangeTheme('default')}>
-            Default
+            Ikuti perangkat
           </button>
           <button className={themeMode === 'dark' ? 'theme-option active' : 'theme-option'} onClick={() => onChangeTheme('dark')}>
             Gelap
@@ -1395,9 +1403,9 @@ function AddBudgetPanel({
   return (
     <section className="card">
       <div className="section-title">
-        <h2>{editingBudget ? 'Ubah budget' : 'Tambah budget'}</h2>
+          <h2>{editingBudget ? 'Ubah anggaran' : 'Tambah anggaran'}</h2>
         {editingBudget ? (
-          <button type="button" className="inline-icon-button" onClick={onCancelEdit} aria-label="Batal ubah budget">
+            <button type="button" className="inline-icon-button" onClick={onCancelEdit} aria-label="Batal ubah anggaran">
             <X size={16} />
           </button>
         ) : (
@@ -1422,14 +1430,14 @@ function AddBudgetPanel({
           <input value={name} onChange={(event) => setName(event.target.value)} placeholder="Makan, transport, tagihan" />
         </label>
         <label className="field-block">
-          <span>Limit budget</span>
+          <span>Batas anggaran</span>
           <input value={limit} onChange={(event) => setLimit(event.target.value)} placeholder="0" type="number" />
         </label>
         <label className="check-row">
           <input type="checkbox" checked={rollover} onChange={(event) => setRollover(event.target.checked)} />
-          <span>Bawa sisa atau selisih budget ke periode berikutnya</span>
+          <span>Bawa sisa atau selisih anggaran ke periode berikutnya</span>
         </label>
-        <button className="primary-button">{editingBudget ? 'Simpan perubahan' : 'Simpan budget'}</button>
+        <button className="primary-button">{editingBudget ? 'Simpan perubahan' : 'Simpan anggaran'}</button>
       </form>
     </section>
   )
@@ -1443,7 +1451,7 @@ function BudgetAlertPanel({
   return (
     <section className="card">
       <div className="section-title">
-        <h2>Alert budget</h2>
+        <h2>Peringatan anggaran</h2>
         <AlertTriangle size={18} />
       </div>
       <div className="alert-list">
@@ -1460,7 +1468,7 @@ function BudgetAlertPanel({
             </article>
           ))
         ) : (
-          <EmptyState icon={CheckCircle2} title="Belum ada alert" description="Semua budget masih dalam batas aman." compact />
+          <EmptyState icon={CheckCircle2} title="Belum ada peringatan" description="Semua anggaran masih dalam batas aman." compact />
         )}
       </div>
     </section>
@@ -1487,7 +1495,7 @@ function BudgetPeriodPanel({
   return (
     <section className="card">
       <div className="section-title">
-        <h2>Periode budget</h2>
+          <h2>Periode anggaran</h2>
         <CalendarRange size={18} />
       </div>
       <form
@@ -1560,9 +1568,11 @@ function AddTransactionPanel({
 }) {
   const [form, setForm] = useState(() => defaultTransactionDraft(accounts, categories, defaultMember))
   const [recurringForm, setRecurringForm] = useState(() => defaultRecurringDraft(accounts, categories, defaultMember))
+  const [entryMode, setEntryMode] = useState<'single' | 'recurring'>('single')
 
   useEffect(() => {
     if (editingTransaction) {
+      setEntryMode('single')
       setForm({
         title: editingTransaction.title,
         amount: editingTransaction.amount,
@@ -1582,6 +1592,7 @@ function AddTransactionPanel({
 
   useEffect(() => {
     if (editingRecurring) {
+      setEntryMode('recurring')
       setRecurringForm({
         title: editingRecurring.title,
         amount: editingRecurring.amount,
@@ -1604,6 +1615,36 @@ function AddTransactionPanel({
 
   return (
     <>
+      <section className="card">
+        <div className="section-title">
+          <h2>Catat</h2>
+          <BadgeDollarSign size={18} />
+        </div>
+        <div className="toggle-grid entry-mode-toggle">
+          <button
+            type="button"
+            className={entryMode === 'single' ? 'toggle-pill active' : 'toggle-pill'}
+            onClick={() => {
+              setEntryMode('single')
+              onCancelRecurringEdit()
+            }}
+          >
+            Transaksi sekali
+          </button>
+          <button
+            type="button"
+            className={entryMode === 'recurring' ? 'toggle-pill active' : 'toggle-pill'}
+            onClick={() => {
+              setEntryMode('recurring')
+              onCancelEdit()
+            }}
+          >
+            Transaksi rutin
+          </button>
+        </div>
+      </section>
+
+      {entryMode === 'single' ? (
       <section className="card">
         <div className="section-title">
           <h2>{editingTransaction ? 'Ubah transaksi' : 'Catat transaksi'}</h2>
@@ -1658,10 +1699,10 @@ function AddTransactionPanel({
 
           {accounts.length > 0 && !categories.length && form.type === 'expense' && (
             <div className="setup-guide compact-guide">
-              <EmptyState icon={Target} title="Budget belum dibuat" description="Pengeluaran tetap bisa dicatat. Kategorinya kamu isi manual dulu, atau bikin budget supaya lebih rapi." compact />
+              <EmptyState icon={Target} title="Anggaran belum dibuat" description="Pengeluaran tetap bisa dicatat. Kategorinya isi manual dulu, atau bikin anggaran biar lebih rapi." compact />
               <div className="setup-guide-actions">
                 <button type="button" className="soft-button" onClick={onOpenBudget}>
-                  Buka budget
+                  Buka anggaran
                 </button>
               </div>
             </div>
@@ -1671,7 +1712,7 @@ function AddTransactionPanel({
             <div className="editor-banner">
               <div>
                 <strong>Lagi mengubah transaksi</strong>
-                <p>Setelah disimpan, saldo dan budget langsung ikut menyesuaikan.</p>
+                  <p>Setelah disimpan, saldo dan anggaran langsung ikut menyesuaikan.</p>
               </div>
               <button type="button" className="ghost-button compact-ghost" onClick={onCancelEdit}>
                 Batal
@@ -1773,7 +1814,7 @@ function AddTransactionPanel({
           </button>
         </form>
       </section>
-
+      ) : (
       <section className="card">
         <div className="section-title">
           <h2>{editingRecurring ? 'Ubah transaksi rutin' : 'Transaksi rutin'}</h2>
@@ -1955,6 +1996,7 @@ function AddTransactionPanel({
           )}
         </div>
       </section>
+      )}
     </>
   )
 }
