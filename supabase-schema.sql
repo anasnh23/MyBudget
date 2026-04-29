@@ -15,6 +15,7 @@ create table if not exists public.budget_categories (
   name text not null,
   limit_amount numeric not null default 0,
   spent_amount numeric not null default 0,
+  rollover_enabled boolean not null default false,
   color text,
   created_at timestamptz not null default now()
 );
@@ -48,6 +49,10 @@ create table if not exists public.transactions (
   date date not null default current_date,
   created_at timestamptz not null default now()
 );
+
+alter table public.transactions add column if not exists to_account_name text;
+alter table public.transactions add column if not exists member_name text;
+alter table public.budget_categories add column if not exists rollover_enabled boolean not null default false;
 
 alter table public.accounts enable row level security;
 alter table public.budget_categories enable row level security;

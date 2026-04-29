@@ -1,4 +1,4 @@
-export type NavKey = 'home' | 'history' | 'add' | 'budget' | 'wallet' | 'profile' | 'setup'
+export type NavKey = 'home' | 'history' | 'add' | 'budget' | 'wallet' | 'asset' | 'profile' | 'setup'
 
 export type TransactionType = 'expense' | 'income' | 'transfer'
 
@@ -22,6 +22,7 @@ export type BudgetCategory = {
   limit: number
   spent: number
   color: string
+  rollover: boolean
 }
 
 export type TransactionItem = {
@@ -31,7 +32,53 @@ export type TransactionItem = {
   type: TransactionType
   category: string
   account: string
+  toAccount?: string
+  member?: string
   date: string
+  note: string
+}
+
+export type RecurringFrequency = 'weekly' | 'monthly'
+
+export type RecurringTransaction = {
+  id: string
+  title: string
+  amount: number
+  type: TransactionType
+  category: string
+  account: string
+  toAccount?: string
+  member?: string
+  note: string
+  frequency: RecurringFrequency
+  nextDate: string
+  lastCreatedAt?: string
+}
+
+export type SavingGoal = {
+  id: string
+  name: string
+  target: number
+  saved: number
+  account?: string
+  note: string
+}
+
+export type ThemeMode = 'default' | 'dark'
+
+export type AssetType = 'deposito' | 'emas' | 'reksa_dana' | 'saham' | 'crypto' | 'lainnya'
+
+export type AssetItem = {
+  id: string
+  name: string
+  type: AssetType
+  initialAmount: number
+  currentValue: number
+  startDate: string
+  tenorMonths?: number
+  interestRate?: number
+  maturityDate?: string
+  estimatedReturn?: number
   note: string
 }
 

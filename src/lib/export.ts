@@ -60,13 +60,14 @@ export function exportBudgetToPdf(payload: ExportPayload) {
     startY: (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY
       ? (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable!.finalY + 10
       : 90,
-    head: [['Tanggal', 'Transaksi', 'Tipe', 'Kategori', 'Akun', 'Nominal']],
+    head: [['Tanggal', 'Transaksi', 'Tipe', 'Kategori', 'Akun', 'Member', 'Nominal']],
     body: payload.transactions.map((item) => [
       compactDate(item.date),
       item.title,
       item.type === 'expense' ? 'Pengeluaran' : item.type === 'income' ? 'Pemasukan' : 'Transfer',
       item.category,
-      item.account,
+      item.type === 'transfer' && item.toAccount ? `${item.account} -> ${item.toAccount}` : item.account,
+      item.member ?? '-',
       `${item.type === 'expense' ? '-' : '+'}${currency(item.amount)}`,
     ]),
     styles: {
@@ -106,7 +107,8 @@ export function exportBudgetToExcel(payload: ExportPayload) {
     Transaksi: item.title,
     Tipe: item.type === 'expense' ? 'Pengeluaran' : item.type === 'income' ? 'Pemasukan' : 'Transfer',
     Kategori: item.category,
-    Akun: item.account,
+    Akun: item.type === 'transfer' && item.toAccount ? `${item.account} -> ${item.toAccount}` : item.account,
+    Member: item.member ?? '',
     Nominal: item.type === 'expense' ? -item.amount : item.amount,
     Catatan: item.note,
   }))
