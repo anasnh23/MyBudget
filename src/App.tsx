@@ -227,6 +227,7 @@ export default function App() {
     updateTransaction,
     updatePeriod,
     selectPeriod,
+    copyBudgetsFromPreviousPeriod,
     applyBudgetRollover,
     undoBudgetRollover,
     deleteTransaction,
@@ -887,6 +888,23 @@ export default function App() {
                       <p className={budgetActionMessage.ok ? 'small-note success-note budget-action-note' : 'small-note warning-note budget-action-note'}>
                         {budgetActionMessage.message}
                       </p>
+                    )}
+                    {!data.budgets.length && data.transactions.some((item) => item.type === 'expense') && (
+                      <div className="budget-recovery-banner">
+                        <div>
+                          <strong>Periode ini sudah punya pengeluaran, tapi anggarannya belum ada.</strong>
+                          <p>Salin kategori anggaran dari periode sebelumnya supaya persentase dan ringkasannya kembali normal.</p>
+                        </div>
+                        <button
+                          className="mini-action-button"
+                          onClick={async () => {
+                            const result = await copyBudgetsFromPreviousPeriod()
+                            setBudgetActionMessage(result)
+                          }}
+                        >
+                          Salin anggaran sebelumnya
+                        </button>
+                      </div>
                     )}
                     {lastRolloverSnapshot && (
                       <p className="small-note budget-action-note">

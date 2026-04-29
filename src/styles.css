@@ -1297,6 +1297,29 @@ textarea:focus {
   margin-top: 10px;
 }
 
+.budget-recovery-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: 12px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: #f8fbff;
+  border: 1px solid #dce8ff;
+}
+
+.budget-recovery-banner strong {
+  display: block;
+  color: #243250;
+}
+
+.budget-recovery-banner p {
+  margin: 6px 0 0;
+  color: #6b7892;
+  font-size: 0.9rem;
+}
+
 .compact-ghost {
   width: auto;
   margin: 0;

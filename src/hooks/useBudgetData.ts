@@ -232,6 +232,15 @@ function resolveTransactionPeriodId(date: string, periods: BudgetPeriod[], activ
   return periods.find((item) => periodContainsDate(item, date))?.id ?? activePeriodId
 }
 
+function pickBudgetSourcePeriodId(periods: BudgetPeriod[], budgets: BudgetCategory[], activePeriodId: string) {
+  const activeBudgets = budgets.filter((item) => item.periodId === activePeriodId)
+  if (activeBudgets.length) {
+    return activePeriodId
+  }
+
+  return periods.find((period) => period.id !== activePeriodId && budgets.some((item) => item.periodId === period.id))?.id
+}
+
 export function useBudgetData(userId?: string, userEmail?: string, demoMode = false) {
   const shouldUseSupabase = supabaseEnabled && !demoMode
   const [periods, setPeriods] = useState<BudgetPeriod[]>(initialBudgetData.periods)
@@ -762,7 +771,8 @@ export function useBudgetData(userId?: string, userEmail?: string, demoMode = fa
       end: payload.end,
     }
 
-    const sourceBudgets = budgets.filter((item) => item.periodId === activePeriodId)
+    const sourcePeriodId = pickBudgetSourcePeriodId(periods, budgets, activePeriodId) ?? activePeriodId
+    const sourceBudgets = budgets.filter((item) => item.periodId === sourcePeriodId)
     const nextBudgets = sourceBudgets.map((item) => {
       const carry = item.limit - item.spent
       return {
@@ -830,6 +840,50 @@ export function useBudgetData(userId?: string, userEmail?: string, demoMode = fa
     setActivePeriodId(periodId)
     setLastRolloverSnapshot(null)
     return syncActivePeriodInSupabase(periodId)
+  }
+
+  const copyBudgetsFromPreviousPeriod = async () => {
+    const sourcePeriodId = pickBudgetSourcePeriodId(periods, budgets, activePeriodId)
+
+    if (!sourcePeriodId || sourcePeriodId === activePeriodId) {
+      return fail('Belum ada anggaran periode sebelumnya yang bisa disalin.')
+    }
+
+    const sourceBudgets = budgets.filter((item) => item.periodId === sourcePeriodId)
+    const activeExpenses = transactions.filter((item) => item.periodId === activePeriodId && item.type === 'expense')
+    const copiedBudgets = sourceBudgets.map((item) => ({
+      ...item,
+      id: uid(),
+      periodId: activePeriodId,
+      spent: activeExpenses
+        .filter((entry) => entry.category === item.name)
+        .reduce((sum, entry) => sum + entry.amount, 0),
+    }))
+
+    setBudgets((prev) => [...copiedBudgets, ...prev])
+
+    if (shouldUseSupabase && supabase && userId) {
+      const result = await supabase.from('budget_categories').insert(
+        copiedBudgets.map((item) => ({
+          id: item.id,
+          user_id: userId,
+          period_id: item.periodId,
+          name: item.name,
+          limit_amount: item.limit,
+          spent_amount: item.spent,
+          rollover_enabled: item.rollover,
+          color: item.color,
+        })),
+      )
+
+      if (result.error) {
+        setBudgets((prev) => prev.filter((item) => !copiedBudgets.some((copied) => copied.id === item.id)))
+        return fail(saveMessage(result.error.message))
+      }
+    }
+
+    const sourcePeriod = periods.find((item) => item.id === sourcePeriodId)
+    return ok(`Anggaran dari periode ${sourcePeriod?.label ?? 'sebelumnya'} berhasil disalin ke periode aktif.`)
   }
 
   const applyBudgetRollover = async () => {
@@ -1085,6 +1139,7 @@ export function useBudgetData(userId?: string, userEmail?: string, demoMode = fa
     updateTransaction,
     updatePeriod,
     selectPeriod,
+    copyBudgetsFromPreviousPeriod,
     applyBudgetRollover,
     undoBudgetRollover,
     deleteTransaction,
