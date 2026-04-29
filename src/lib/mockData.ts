@@ -1,0 +1,75 @@
+import type { BudgetData } from '../types'
+
+export const initialBudgetData: BudgetData = {
+  period: {
+    label: 'April 2026',
+    start: '2026-04-01',
+    end: '2026-04-30',
+  },
+  accounts: [
+    { id: 'acc-1', name: 'BCA', balance: 4250000, color: '#6346f7' },
+    { id: 'acc-2', name: 'SeaBank', balance: 2875000, color: '#13b981' },
+    { id: 'acc-3', name: 'Cash', balance: 950000, color: '#f59e0b' },
+  ],
+  members: [
+    { id: 'mem-1', name: 'Admin Banyuwangi', email: 'admin@kunci.cloud', role: 'Admin' },
+  ],
+  budgets: [
+    { id: 'bud-1', name: 'Makan', limit: 1800000, spent: 950000, color: '#6346f7' },
+    { id: 'bud-2', name: 'Transport', limit: 900000, spent: 475000, color: '#06b6d4' },
+    { id: 'bud-3', name: 'Tagihan', limit: 2200000, spent: 1460000, color: '#ef4444' },
+    { id: 'bud-4', name: 'Hiburan', limit: 750000, spent: 325000, color: '#f59e0b' },
+  ],
+  transactions: [
+    {
+      id: 'trx-1',
+      title: 'Gaji Bulanan',
+      amount: 8500000,
+      type: 'income',
+      category: 'Gaji',
+      account: 'BCA',
+      date: '2026-04-25',
+      note: 'Payroll bulan ini',
+    },
+    {
+      id: 'trx-2',
+      title: 'Makan Siang',
+      amount: 68000,
+      type: 'expense',
+      category: 'Makan',
+      account: 'Cash',
+      date: '2026-04-27',
+      note: 'Lunch meeting',
+    },
+    {
+      id: 'trx-3',
+      title: 'BBM Motor',
+      amount: 120000,
+      type: 'expense',
+      category: 'Transport',
+      account: 'SeaBank',
+      date: '2026-04-26',
+      note: 'Isi bensin',
+    },
+    {
+      id: 'trx-4',
+      title: 'Transfer Tabungan',
+      amount: 500000,
+      type: 'transfer',
+      category: 'Transfer',
+      account: 'BCA',
+      date: '2026-04-22',
+      note: 'Pindah ke rekening cadangan',
+    },
+    {
+      id: 'trx-5',
+      title: 'Netflix',
+      amount: 186000,
+      type: 'expense',
+      category: 'Tagihan',
+      account: 'BCA',
+      date: '2026-04-20',
+      note: 'Langganan bulanan',
+    },
+  ],
+}
